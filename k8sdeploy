@@ -135,7 +135,6 @@ class KubernetesDeploy():
     def load_deploy(self,template,action):
         try:
             rendered=self.load_template(template,self.vars)
-            print(rendered)
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
                 temp_file.write(rendered)
             run(['kubectl', action ,'-f',temp_file.name ])
@@ -147,19 +146,20 @@ class KubernetesDeploy():
             os.unlink(temp_file.name)
 
     def deploy_objects(self,action="apply",delete_namespace=False):
-        # Deploy k8s objects
-        if action != "delete":
-            self.load_deploy("namespace",action)
-        if self.vars['secret']:
-            self.load_deploy("secret",action)
-        if self.vars['configmap']:
-            self.load_deploy("configmap",action)
-        self.load_deploy("deployment",action)
-        self.load_deploy("service",action)
-        if self.vars['create_ingress']:
-            self.load_deploy("ingress",action)
-        if action=="delete" and delete_namespace:
-            self.load_deploy("namespace",action)
+        if self.checkAWSToken():
+            # Deploy k8s objects
+            if action != "delete":
+                self.load_deploy("namespace",action)
+            if self.vars['secret']:
+                self.load_deploy("secret",action)
+            if self.vars['configmap']:
+                self.load_deploy("configmap",action)
+            self.load_deploy("deployment",action)
+            self.load_deploy("service",action)
+            if self.vars['create_ingress']:
+                self.load_deploy("ingress",action)
+            if action=="delete" and delete_namespace:
+                self.load_deploy("namespace",action)
 
         
 
