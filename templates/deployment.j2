@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ target_app_name }}
+  namespace: {{ target_namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ target_app_name }}
+  replicas: {{ deployment_replicas }}
+  template:
+    metadata:
+      labels:
+        app: {{ target_app_name }}
+    spec:
+      containers:
+      - image: {{ target_image_registry }}/{{ target_image }}:{{ target_image_tag }}
+        imagePullPolicy: Always
+        name: {{ target_app_name }}
+        ports:
+        - containerPort: {{ target_app_port }}
+        {% if secret or configmap -%}
+        envFrom:
+{%- if secret %}     
+        - secretRef:
+            name: {{ target_app_name }}-secret
+{%- endif -%}
+{% if configmap %}
+        - configMapRef:
+            name: {{ target_app_name }}-cm
+{%- endif -%}
+{%- endif -%}
+
