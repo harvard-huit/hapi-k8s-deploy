@@ -16,18 +16,16 @@ This package installs scripts that can run from the command line. In addition, t
 
 Must be logged into the appropriate AWS account for secrets  `stack/secretname` to exist.
 
-        $ k8sdeploy --help
-                usage: k8sdeploy [-h] [-s STACK] [-f FILENAME]
+        usage: k8sdeploy [-h] [-s STACK] [-a ACTION] [-f FILENAME]
 
-                Deploy Namespace, Secret, ConfigMap, Deployment, Service, and Ingress.
+        Create K8s artifacts within cluster.
 
-                optional arguments:
-                -h, --help            show this help message and exit
-                -s STACK, --stack STACK
-                                        stack(default=`dev`)
-                -f FILENAME, --filename FILENAME
-                                        Specific ansible yaml file. Default: {current directory}/k8s_vars/{ stack }_k8s_vars.yml
-        $ # default stack=dev
-          # default file location
-          # {current directory}/k8s_vars/{ stack }_k8s_vars.yml
+        options:
+        -h, --help            show this help message and exit
+        -s STACK, --stack STACK
+                                stack(default='dev')
+        -a ACTION, --action ACTION
+                                Action verb: create, delete, apply (default='apply')
+        -f FILENAME, --filename FILENAME
+                                Specific filename to pass in k8s vars yaml file. Default: {current directory}/k8s_vars/{stack}_k8s_vars.yml
         
