@@ -180,7 +180,7 @@ if __name__ == '__main__':
                                 Default: {current directory}/k8s_vars/{stack}_k8s_vars.yml
                                 """)
     args=parser1.parse_args()
-    if checkAWSToken():
-        deploy=KubernetesDeploy(args.filename,args.stack)
-        deploy.deploy_objects(action=args.action)
+    
+    deploy=KubernetesDeploy(args.filename,args.stack)
+    deploy.deploy_objects(action=args.action)
 
