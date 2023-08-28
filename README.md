@@ -4,12 +4,15 @@ HAPI Kubernetes Deploy
 This package installs scripts that can run from the command line. In addition, the script deploys application to HAPI K8s Clusters.
 
 ## Install
+git clone repository.
 
-        pip install https://github.com/harvard-huit/hapi-k8s-deploy/zipball/main
+        cd hapi-k8s-deploy/
+        pip install .
 
 ## Upgrade
 
-        pip install https://github.com/harvard-huit/hapi-k8s-deploy/zipball/main  -U
+        cd hapi-k8s-deploy/
+        pip install  -U .
 
 
 ## Operation
