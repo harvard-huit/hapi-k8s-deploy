@@ -4,3 +4,5 @@ aws_load_balancer_backend_protocol: HTTPS
 deployment_replicas: 3
 ingress_group_order: 0
 create_ingress: True
+# Ingress group defaults to ingress_load_balancer_name
+ingress_group_name: {{ ingress_load_balancer_name }}
