@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "k8sdeploy"
-dynamic = ["version"]
+version = "1.0.0"
+
 authors = [
     {name = "Harvard API Team", email = "apihelp@harvard.edu"},
 ]
