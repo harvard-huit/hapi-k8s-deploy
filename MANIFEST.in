@@ -1,0 +1,2 @@
+include src/k8sdeploy/default_vars/*.yml
+include src/k8sdeploy/templates/*.j2
