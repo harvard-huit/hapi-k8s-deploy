@@ -8,7 +8,7 @@ class UserNamespace(object):
     """ Arg Parser class """
     pass
 
-if __name__ == '__main__':
+def main():
     user_namespace = UserNamespace()
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-s","--stack", type=str,default="dev",
