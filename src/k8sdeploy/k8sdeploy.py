@@ -90,7 +90,7 @@ class KubernetesDeploy():
 
     def get_cert_arn(self,var_data):
         arn= None
-        if 'aws_load_balancer_ssl_cert' in var_data: #self.vars:
+        if 'aws_load_balancer_ssl_cert' in var_data:
             arn= var_data['aws_load_balancer_ssl_cert']
         else:
             acm=boto3.client('acm')
@@ -109,8 +109,7 @@ class KubernetesDeploy():
             return yaml.safe_load(f1.read())
 
     def generate_secret_configmap_data(self,var_data):
-        data={"secret":{},"configmap":{}} # 
-        # result={"secret":{},"configmap":{}}
+        data={"secret":{},"configmap":{}} 
         if 'target_app_secrets_ref' in var_data:
             for itm in var_data['target_app_secrets_ref']:
                 for i in itm:
