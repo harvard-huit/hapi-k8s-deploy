@@ -1,9 +1,0 @@
-target_image_registry: 328144961263.dkr.ecr.us-east-1.amazonaws.com
-#image_registry: docker.io/library
-aws_load_balancer_backend_protocol: HTTPS
-deployment_replicas: 3
-# Ingress
-create_ingress: True
-ingress_group_order: 0
-# Ingress group defaults to ingress_load_balancer_name
-ingress_group_name: {{ ingress_load_balancer_name }}
