@@ -1,7 +1,7 @@
 HAPI Kubernetes Deploy
 ====================
 
-This package installs scripts that can run from the command line. In addition, the script deploys application to HAPI K8s Clusters.
+This package installs scripts that can run from the command line. In addition, the script deploys applications to the HAPI K8s Clusters.
 
 ## Install
 git clone repository.
