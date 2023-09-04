@@ -2,7 +2,7 @@
 
 import os
 import argparse
-from k8sdeploy import KubernetesDeploy
+from k8sdeploy.k8sdeploy import KubernetesDeploy
 
 class UserNamespace(object):
     """ Arg Parser class """
