@@ -24,6 +24,5 @@ create_ingress: False
 ingress_hostname: hostname
 ingress_path: /public/apigee-mgmt
 ingress_health_check_path: /public/apigee-mgmt/health
-ingress_health_check_response_codes: 200-399
-ingress_load_balancer_name: adexk8s-utility-dev-pub-alb
-ingress_group_name: adex-utility-dev
+ingress_health_check_response_codes: '200-399'
+ingress_load_balancer_name: adexk8s-utility-sand-pub-alb
