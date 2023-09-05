@@ -27,4 +27,3 @@ def main():
     
     deploy=KubernetesDeploy(args.filename,args.stack)
     deploy.deploy_objects(action=args.action)
-
