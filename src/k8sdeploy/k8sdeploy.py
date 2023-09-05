@@ -1,18 +1,21 @@
 import boto3
-from botocore.exceptions import ClientError
-import os, yaml
+import os
+import yaml
 import jinja2
 import json
 import tempfile
 import base64
+from botocore.exceptions import ClientError
 from subprocess import run
 from six import b
 
 class KubernetesDeploy():
     def __init__(self,var_filename,stack):
         self.stack=stack
+        self.default_path=f"{os.path.dirname(os.path.abspath(__file__))}"
         self.account=""
         self.vars=self.__deploy_data__(var_filename)
+        
     
     def __deploy_data__(self,filename):
         if self.checkAWSToken():
@@ -27,7 +30,8 @@ class KubernetesDeploy():
             d=data.pop("target_app_env",None)
             return data
             
-    def load_defaults(self,filename,data, path="./default_vars"):
+    def load_defaults(self,filename,data):
+        path=f"{self.default_path}/default_vars"
         templateLoader = jinja2.FileSystemLoader(searchpath=path)
         template_env=jinja2.Environment(loader=templateLoader, autoescape=True)
         template=template_env.get_template(filename)
@@ -121,8 +125,9 @@ class KubernetesDeploy():
                 data["configmap"][itm['name']]="".join(itm['value'].split())
         return data
 
-    def load_template(self,template_name,data, custom_path=None):
-        templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
+    def load_template(self,template_name,data):
+        path=f"{self.default_path}/templates"
+        templateLoader = jinja2.FileSystemLoader(searchpath=path)
         template_env=jinja2.Environment(loader=templateLoader, autoescape=True)
         template=template_env.get_template(f"{template_name}.j2")
         return template.render(**data)
