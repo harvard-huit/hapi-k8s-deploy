@@ -2,9 +2,16 @@ HAPI Kubernetes Deploy
 ====================
 
 This package installs scripts that can run from the command line. In addition, the script deploys applications to the HAPI K8s Clusters.
+## Requirements
+1. AWS Login (Within appropriate AWS Account)
+1. Kubectl 
+1. Kubectl config file
 
+        aws eks --region us-east-1 update-kubeconfig --name adexk8s-eks-cluster-{stack} --alias env-{stack}
+        
 ## Install
-I made the `hapi-k8s-deploy` repository private. This was done because of default_vars. The `target_image_registry` has the AWS account number and thought that may be revealing sensitive information. 
+
+I made the `hapi-k8s-deploy` repository private. This was done because of default_vars. The `target_image_registry` has the AWS account number and thought that may be revealing sensitive information. Unable to pip install from github repository, clone first.
 
 git clone repository.
 
