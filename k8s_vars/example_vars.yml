@@ -15,14 +15,14 @@ target_app_env:
   - name: DEBUG
     value: "True"
 target_app_name: hapi-apigee-management-api
-target_image: hapi-apigee-management-api
+target_image_name: hapi-apigee-management-api
 target_image_tag: 0.0.1
-target_namespace: utility-test
+target_namespace: utility-test-ty
 target_app_port: 9012
 target_memory_mb: 256
 create_ingress: False
 ingress_hostname: hostname
 ingress_path: /public/apigee-mgmt
 ingress_health_check_path: /public/apigee-mgmt/health
-ingress_health_check_response_codes: '200-399'
+successful_response_codes: '200-399'
 ingress_load_balancer_name: adexk8s-utility-sand-pub-alb
