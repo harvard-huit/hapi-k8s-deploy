@@ -5,7 +5,9 @@ import jinja2
 import json
 import tempfile
 import base64
-from botocore.exceptions import ClientError
+import sys
+from contextlib import contextmanager
+from botocore.exceptions import ClientError, NoCredentialsError
 from subprocess import run
 from six import b
 
@@ -18,17 +20,17 @@ class KubernetesDeploy():
         
     
     def __deploy_data__(self,filename):
-        if self.checkAWSToken():
-            var_data=self.read_variable_file(filename)
-            secret_cm=self.generate_secret_configmap_data(var_data)
-            data = secret_cm | var_data
-            data = self.load_defaults('default_vars.yml',data) | data 
-            #data = self.read_variable_file('k8s_vars/default_vars.yml') | data
-            data=self.get_cert_arn(data)
-            data=self.get_tag_data(data)
-            d=data.pop("target_app_secrets_ref",None)
-            d=data.pop("target_app_env",None)
-            return data
+        self.checkAWSToken()
+        var_data=self.read_variable_file(filename)
+        secret_cm=self.generate_secret_configmap_data(var_data)
+        data = secret_cm | var_data
+        data = self.load_defaults('default_vars.yml',data) | data 
+        #data = self.read_variable_file('k8s_vars/default_vars.yml') | data
+        data=self.get_cert_arn(data)
+        data=self.get_tag_data(data)
+        d=data.pop("target_app_secrets_ref",None)
+        d=data.pop("target_app_env",None)
+        return data
             
     def load_defaults(self,filename,data):
         path=f"{self.default_path}/default_vars"
@@ -77,20 +79,39 @@ class KubernetesDeploy():
                 binary_secret_data = get_secret_value_response['SecretBinary']
                 return binary_secret_data
 
+    @contextmanager
+    def disable_exception_traceback(self):
+        """
+        All traceback information is suppressed and only the exception type and value are printed
+        """
+        default_value = getattr(sys, "tracebacklimit", 1000)  # `1000` is a Python's default value
+        sys.tracebacklimit = 0
+        yield
+        sys.tracebacklimit = default_value  # revert changes
+
     def checkAWSToken(self):
         """
         Check if AWS Token has expired
         """
-        status=True
-        sts = boto3.client('sts')
+        lookup={"sand":"328144961263","dev":"328144961263","stage":"412027274215","prod":"412027274215"}
+        #status=True
+        
         try:
+            sts = boto3.client('sts')
             account=sts.get_caller_identity()['Account']
             self.account=account
+            if account != lookup[self.stack]:
+                with self.disable_exception_traceback():
+                    raise Exception(f"Stack '{self.stack}' is not consistent with AWS Account. Please login to the correct AWS Account. ")
         except ClientError as e:
-            if e.response['Error']['Code'] == 'ExpiredToken':
-                print("The AWS Token has expired. Please login to the AWS CLI and try again.")
-                status=False
-        return status
+            with self.disable_exception_traceback():
+                if e.response['Error']['Code'] == 'ExpiredToken':
+                    raise Exception("ExpiredToken: AWS Token has expired") from None
+                else:
+                    raise Exception(f"{repr(e)}. k8sdeploy requires valid AWS Token") from None
+        except NoCredentialsError as e1:
+            with self.disable_exception_traceback():
+                raise Exception(f"{repr(e1)}. k8sdeploy requires valid AWS Token") from None
 
     def get_cert_arn(self,var_data):
         arn= None
@@ -146,17 +167,17 @@ class KubernetesDeploy():
             os.unlink(temp_file.name)
 
     def deploy_objects(self,action="apply",delete_namespace=False):
-        if self.checkAWSToken():
-            # Deploy k8s objects
-            if action != "delete":
-                self.load_deploy("namespace",action)
-            if self.vars['secret']:
-                self.load_deploy("secret",action)
-            if self.vars['configmap']:
-                self.load_deploy("configmap",action)
-            self.load_deploy("deployment",action)
-            self.load_deploy("service",action)
-            if self.vars['create_ingress']:
-                self.load_deploy("ingress",action)
-            if action=="delete" and delete_namespace:
-                self.load_deploy("namespace",action)
+        self.checkAWSToken()
+        # Deploy k8s objects
+        if action != "delete":
+            self.load_deploy("namespace",action)
+        if self.vars['secret']:
+            self.load_deploy("secret",action)
+        if self.vars['configmap']:
+            self.load_deploy("configmap",action)
+        self.load_deploy("deployment",action)
+        self.load_deploy("service",action)
+        if self.vars['create_ingress']:
+            self.load_deploy("ingress",action)
+        if action=="delete" and delete_namespace:
+            self.load_deploy("namespace",action)
