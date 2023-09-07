@@ -7,14 +7,14 @@ spec:
   selector:
     matchLabels:
       app: {{ target_app_name }}
-  replicas: {{ deployment_replicas }}
+  replicas: {{ target_replica_count }}
   template:
     metadata:
       labels:
         app: {{ target_app_name }}
     spec:
       containers:
-      - image: {{ target_image_registry }}/{{ target_image }}:{{ target_image_tag }}
+      - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag }}
         imagePullPolicy: Always
         name: {{ target_app_name }}
         ports:

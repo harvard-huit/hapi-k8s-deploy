@@ -13,8 +13,10 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-s","--stack", type=str,default="dev",
                         help="stack(default='dev')")
+    
     parser.add_argument("-a","--action", type=str,default="apply",
                         help="Action verb: create, delete, apply (default='apply')")
+    parser.add_argument("-d","--delete-namespace", action='store_true',help="Delete Namespace: only used if action is 'delete'")
     parser.parse_known_args(namespace=user_namespace)
     parser1 = argparse.ArgumentParser(description="Create K8s artifacts within cluster.", 
     parents=[parser])
@@ -24,6 +26,5 @@ def main():
                                 Default: {current directory}/k8s_vars/{stack}_k8s_vars.yml
                                 """)
     args=parser1.parse_args()
-    
     deploy=KubernetesDeploy(args.filename,args.stack)
-    deploy.deploy_objects(action=args.action)
+    deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
