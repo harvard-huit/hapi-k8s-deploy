@@ -1,9 +1,9 @@
 ansible_vars
-genEnv.egg-info
+k8sDeploy.egg-info
 genLocalEnvFile.egg-info
 build
 virtpy
 venv
-
-.env
+__pycache__
+ .env
 .env_local

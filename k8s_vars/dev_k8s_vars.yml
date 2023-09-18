@@ -1,0 +1,28 @@
+target_app_secrets_ref:
+  - APIGEE_MACHINE_PASSWORD: apigee-nonprod-common@harvard.edu
+    API_KEY: adex-apigee-migration-api-key
+    DB_CONFIG: adex-utilsdb-config-data
+    PG_DB_CONFIG: hapi-utilitydb-config
+    SPLUNK_USER_CONFIG: adex-splunk-machine-user
+    PDS_KEY: adex-cap-utils-api-key
+target_app_env:
+  - name: APIGEE_MACHINE_USERNAME
+    value: apigee-nonprod-common@harvard.edu
+  - name: APIGEE_ORGANIZATION
+    value: harvard-nonprod
+  - name: PDS_URL
+    value: https://go.prod.apis.huit.harvard.edu/ats/person/v3/search
+  - name: DEBUG
+    value: "True"
+target_app_name: hapi-apigee-management-api
+target_image_name: hapi-apigee-management-api
+target_image_tag: 0.0.1
+target_namespace: utility-test-ty
+target_app_port: 9012
+target_memory_mb: 256
+create_ingress: False
+ingress_hostname: hostname
+ingress_path: /public/apigee-mgmt
+ingress_health_check_path: /public/apigee-mgmt/health
+successful_response_codes: '200-399'
+ingress_load_balancer_name: adexk8s-utility-sand-pub-alb

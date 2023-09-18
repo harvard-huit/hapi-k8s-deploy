@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ app_name }}-ingress
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/group.name: {{ ingress_group_name }}
+    alb.ingress.kubernetes.io/group.order: {{ ingress_group_order }}
+    alb.ingress.kubernetes.io/load-balancer-name: {{ ingress_load_balancer_name }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ ingress_health_check_path }}
+    alb.ingress.kubernetes.io/success-codes: {{ successful_response_codes }}
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/tags: Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/backend-protocol: {{ aws_load_balancer_backend_protocol }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ aws_load_balancer_ssl_cert }}
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+    alb.ingress.kubernetes.io/security-groups: {{ ingress_inbound_security_groups }}
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ ingress_hostname }}
+      http:
+        paths:
+        - path: {{ ingress_path }}
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ target_app_name }}-service
+              port:
+                name: https
