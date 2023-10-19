@@ -26,7 +26,7 @@ git clone repository.
 
 Must be logged into the appropriate AWS account for secrets  `stack/secretname` to exist.
 
-        usage: k8sdeploy [-h] [-s STACK] [-a ACTION] [-f FILENAME]
+        usage: k8sdeploy [-h] [-s STACK] [-a ACTION] [-d] [-f FILENAME] [-e ECR_ACCOUNT_ID]
 
         Create K8s artifacts within cluster.
 
@@ -36,8 +36,13 @@ Must be logged into the appropriate AWS account for secrets  `stack/secretname` 
                                 stack(default='dev')
         -a ACTION, --action ACTION
                                 Action verb: create, delete, apply (default='apply')
+        -d, --delete-namespace
+                                Delete Namespace: only used if action is 'delete'
         -f FILENAME, --filename FILENAME
-                                Specific filename to pass in k8s vars yaml file. Default: {current directory}/k8s_vars/{stack}_k8s_vars.yml
+                                Specific filename to pass in k8s vars yaml file. Default: {current
+                                directory}/k8s_vars/{stack}_k8s_vars.yml
+        -e ECR_ACCOUNT_ID, --ecr-account-id ECR_ACCOUNT_ID
+                                ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'
         
 
 
