@@ -4,6 +4,7 @@ genLocalEnvFile.egg-info
 build
 virtpy
 venv
+env
 __pycache__
  .env
 .env_local
