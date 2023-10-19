@@ -25,6 +25,9 @@ def main():
                         help="""Specific filename to pass in k8s vars yaml file. 
                                 Default: {current directory}/k8s_vars/{stack}_k8s_vars.yml
                                 """)
+    parser1.add_argument("-e","--ecr-account-id", type=str, 
+                        default=f"{os.getenv('ECR_ACCOUNT_ID','')}",
+                        help="""ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'""")
     args=parser1.parse_args()
     deploy=KubernetesDeploy(args.filename,args.stack)
     deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
