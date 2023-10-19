@@ -11,8 +11,6 @@ This package installs scripts that can run from the command line. In addition, t
         
 ## Install
 
-I made the `hapi-k8s-deploy` repository private. This was done because of default_vars. The `target_image_registry` has the AWS account number and thought that may be revealing sensitive information. Unable to pip install from github repository, clone first.
-
 git clone repository.
 
         cd hapi-k8s-deploy/
