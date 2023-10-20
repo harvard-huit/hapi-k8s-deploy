@@ -8,7 +8,7 @@ import base64
 import sys
 from contextlib import contextmanager
 from botocore.exceptions import ClientError, NoCredentialsError
-from subprocess import run
+from subprocess import run, check_output
 from six import b
 
 class KubernetesDeploy():
@@ -157,11 +157,12 @@ class KubernetesDeploy():
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
                 temp_file.write(rendered)
             if template == "deployment":
-                result=run(['kubectl', action ,'-f',temp_file.name ],capture_output=True)
-                print(result.stdout.decode('utf-8'))
-                if "unchanged" in result.stdout.decode('utf-8'):
+                result=check_output(['kubectl', action ,'-f',temp_file.name ], encoding='UTF-8')
+                #result=run(['kubectl', action ,'-f',temp_file.name ],capture_output=True)
+                print(result) #.stdout.decode('utf-8'))
+                if "unchanged" in result: #.stdout.decode('utf-8'):
                     self.rollout_restart=True
-                print(result.stderr.decode('utf.8')) 
+                #print(result)#.stderr.decode('utf.8')) 
             else:
                 run(['kubectl', action ,'-f',temp_file.name ])
         except Exception as e:
