@@ -158,11 +158,9 @@ class KubernetesDeploy():
                 temp_file.write(rendered)
             if template == "deployment":
                 result=check_output(['kubectl', action ,'-f',temp_file.name ], encoding='UTF-8')
-                #result=run(['kubectl', action ,'-f',temp_file.name ],capture_output=True)
-                print(result) #.stdout.decode('utf-8'))
-                if "unchanged" in result: #.stdout.decode('utf-8'):
+                print(result)
+                if "unchanged" in result:
                     self.rollout_restart=True
-                #print(result)#.stderr.decode('utf.8')) 
             else:
                 run(['kubectl', action ,'-f',temp_file.name ])
         except Exception as e:
