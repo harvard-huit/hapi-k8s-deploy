@@ -17,6 +17,7 @@ class KubernetesDeploy():
         self.default_path=f"{os.path.dirname(os.path.abspath(__file__))}"
         self.account=""
         self.vars=self.__deploy_data__(var_filename,ecr_account_id)
+        self.rollout_restart=False
 
     def __deploy_data__(self,filename,ecr_account_id):
         self.checkAWSToken(ecr_account_id)
@@ -155,7 +156,13 @@ class KubernetesDeploy():
             rendered=self.load_template(template,self.vars)
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
                 temp_file.write(rendered)
-            run(['kubectl', action ,'-f',temp_file.name ])
+            if template == "deployment":
+                result=run(['kubectl', action ,'-f',temp_file.name ],capture_output=True)
+                if "unchanged" in result.stdout:
+                    self.rollout_restart=True
+                print(result.stdout,result.stderr)
+            else:
+                run(['kubectl', action ,'-f',temp_file.name ])
         except Exception as e:
             print (e)
         finally:
@@ -163,6 +170,12 @@ class KubernetesDeploy():
             temp_file.close()
             os.unlink(temp_file.name)
 
+    def deployment_rollout_restart(self):
+        self.vars['target_app_name']
+        run(['kubectl', "rollout", "restart" ,
+             f"deployment.apps/{self.vars['target_app_name']}",
+             "-n", f"{self.vars['target_namespace']}"])
+        
     def deploy_objects(self,action="apply",delete_namespace=False):
         self.checkAWSToken(self.vars['ecr_account_id'])
         # Deploy k8s objects
@@ -178,3 +191,5 @@ class KubernetesDeploy():
             self.load_deploy("ingress",action)
         if action=="delete" and delete_namespace:
             self.load_deploy("namespace",action)
+        if self.rollout_restart:
+            self.deployment_rollout_restart()
