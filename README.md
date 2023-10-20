@@ -22,7 +22,11 @@ git clone repository.
         pip install  -U .
 
 
+
 ## Operation
+Must set ENV Variable or pass in ECR_ACCOUNT_ID
+
+        export ECR_ACCOUNT_ID={{ ECR Account Id }} 
 
 Must be logged into the appropriate AWS account for secrets  `stack/secretname` to exist.
 
