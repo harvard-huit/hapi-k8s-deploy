@@ -4,7 +4,7 @@ target_image_name: {{ target_app_name }}
 aws_load_balancer_backend_protocol: HTTPS
 target_replica_count: 3
 # Ingress
-create_ingress: True
+create_ingress: False
 ingress_group_order: '0'
 ingress_inbound_security_groups: sg-0d3081250fed98f00,sg-087fd3cc5c488e2db
 
