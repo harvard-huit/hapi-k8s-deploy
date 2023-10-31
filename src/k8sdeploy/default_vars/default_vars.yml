@@ -1,10 +1,12 @@
+# Default all deploy types
+deploy_type: api
 target_image_registry: {{ ecr_account_id }}.dkr.ecr.us-east-1.amazonaws.com
 target_image_name: {{ target_app_name }}
-#image_registry: docker.io/library
-aws_load_balancer_backend_protocol: HTTPS
 target_replica_count: 3
 # Ingress
+# Default to not create Ingress
 create_ingress: False
+aws_load_balancer_backend_protocol: HTTPS
 ingress_group_order: '0'
 ingress_inbound_security_groups: sg-0d3081250fed98f00,sg-087fd3cc5c488e2db
 
@@ -13,3 +15,9 @@ ingress_path: /
 ingress_group_name: {{ ingress_load_balancer_name }}
 ingress_health_check_path: /
 successful_response_codes: '200'
+
+#CronJob or Job Variable
+job_interval: ''
+restart_policy: OnFailure
+backoffLimit: 6
+concurrency_policy: Allow

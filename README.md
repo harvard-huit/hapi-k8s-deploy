@@ -50,10 +50,11 @@ Must be logged into the appropriate AWS account for secrets  `stack/secretname` 
         
 
 
-## K8s Variables
+## K8s Variables API deploy
 
 Variable | Type | Description | Default Value
 -------- | ---- | ----------- | -------------
+deploy_type| string|deploy type: api,cronjob| api
 target_namespace| string | Required field - Kubernetes namespace |
 target_app_name | string | Required field with application name (Alphanumeric with dash separator) |
 target_app_port | int | required field - port exposed within container |
@@ -71,3 +72,16 @@ successful_response_codes| str | Optional field if create_ingress is True - Heal
 ingress_load_balancer_name | str | Required Field if create_ingress is True - Name of AWS ALB | 
 ingress_group_name | str | Application Load Balancer group, combine multiple applications within one ALB | ingress_load_balancer_name
 ingress_inbound_security_groups | str | Inbound Security group Ids | Apigee Edge IPs and DMSDEVOPS Tunnel
+
+## Variables Job/CronJob 
+deploy_type=job or cronjob
+
+Variable | Type | Description | Default Value
+-------- | ---- | ----------- | -------------
+job_interval| string | [Cron Syntax](https://en.wikipedia.org/wiki/Cron) if job_interval not set will perform once as a Kubernetes Job.| None
+restart_policy | string | Restart Policy: Never or OnFailure is allowed. | OnFailure
+backoff_limit | string | There are situations where you want to fail a Job after some amount of retries due to a logical error. Specify the number of retries before considering a Job as failed. | 6 
+concurrency_policy| string |  Specifies how to treat concurrent executions of a job that is created by this CronJob. Concurrency policies: Allow, Forbid, Replace | Allow 
+
+
+

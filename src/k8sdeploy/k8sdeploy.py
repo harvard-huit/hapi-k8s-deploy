@@ -179,18 +179,21 @@ class KubernetesDeploy():
         
     def deploy_objects(self,action="apply",delete_namespace=False):
         self.checkAWSToken(self.vars['ecr_account_id'])
-        # Deploy k8s objects
-        if action != "delete":
-            self.load_deploy("namespace",action)
-        if self.vars['secret']:
-            self.load_deploy("secret",action)
-        if self.vars['configmap']:
-            self.load_deploy("configmap",action)
-        self.load_deploy("deployment",action)
-        self.load_deploy("service",action)
-        if self.vars['create_ingress']:
-            self.load_deploy("ingress",action)
-        if action=="delete" and delete_namespace:
-            self.load_deploy("namespace",action)
-        if self.rollout_restart:
-            self.deployment_rollout_restart()
+        if self.vars['deploy_type'].lower() == 'api':
+            # Deploy k8s objects
+            if action != "delete":
+                self.load_deploy("namespace",action)
+            if self.vars['secret']:
+                self.load_deploy("secret",action)
+            if self.vars['configmap']:
+                self.load_deploy("configmap",action)
+            self.load_deploy("deployment",action)
+            self.load_deploy("service",action)
+            if self.vars['create_ingress']:
+                self.load_deploy("ingress",action)
+            if action=="delete" and delete_namespace:
+                self.load_deploy("namespace",action)
+            if self.rollout_restart:
+                self.deployment_rollout_restart()
+        elif self.vars['deploy_type'].lower() in ['job','cronjob']:
+            self.load_deploy("jobs",action)
