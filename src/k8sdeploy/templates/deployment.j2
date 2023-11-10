@@ -14,7 +14,7 @@ spec:
         app: {{ target_app_name }}
     spec:
       containers:
-      - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag }}
+      - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_release_tag or target_image_tag or target_stack }}
         imagePullPolicy: Always
         name: {{ target_app_name }}
         ports:

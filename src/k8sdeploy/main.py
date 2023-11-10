@@ -28,6 +28,9 @@ def main():
     parser1.add_argument("-e","--ecr-account", type=str, 
                         default=f"{os.getenv('ECR_ACCOUNT_ID','')}",
                         help="""ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'""")
+    parser1.add_argument("-r","--release-tag", type=str, 
+                        default="",
+                        help="""Github Release Tag: Default is an empty string resolve to false""")
     args=parser1.parse_args()
-    deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)
+    deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account,args.release_tag)
     deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)

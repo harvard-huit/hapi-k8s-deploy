@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: {{ 'CronJob' if job_interval else 'Job' }}
+metadata:
+  name: {{ target_app_name }}
+  namespace: {{ target_namespace }}
+spec:
+{%- if job_interval %}     
+  schedule: "{{ job_interval }}"
+{%- endif %}  
+  {{ 'jobTemplate' if job_interval else 'template' }}:
+    backoffLimit: {{ backoff_limit }}
+    spec:
+      template:
+        spec:
+{%- if job_interval %}     
+          concurrencyPolicy: {{ concurrency_policy }}
+{%- endif %}
+          containers:
+          - name: {{ target_app_name }}
+            image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_release_tag or target_image_tag or target_stack }}
+            imagePullPolicy: Always
+{%- if job_command %}
+            command: {{job_command | safe }}
+{%- endif -%}
+          restartPolicy: {{ restart_policy }}
