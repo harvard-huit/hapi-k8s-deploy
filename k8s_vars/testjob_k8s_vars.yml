@@ -1,0 +1,17 @@
+target_app_secrets_ref:
+  - PDS_API_KEY: adex-vectorsolution-pds-api-key
+    SLACK_API_KEY: adex-apigee-backup-slack-api-key
+    VSOLUTION_CLIENT_SECRET: vector-solutions-client-key
+target_app_env:
+  - name: EXAMPLE_ID
+    value: EXAMPLE1
+
+deploy_type: job
+target_app_name: example_job
+#target_image_tag: 0.0.1
+job_interval: "5 8 * * 0"
+job_command: ['ls','-ltra']
+#target_image_tag: 0.0.1
+target_stack: dev
+# job_description: 1xmonth-prod
+# target_memory_mb: 256
