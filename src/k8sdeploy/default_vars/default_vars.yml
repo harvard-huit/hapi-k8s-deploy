@@ -17,7 +17,8 @@ ingress_health_check_path: /
 successful_response_codes: '200'
 
 #CronJob or Job Variable
+job_command: []
 job_interval: ''
 restart_policy: OnFailure
-backoffLimit: 6
+backoff_limit: 6
 concurrency_policy: Allow
