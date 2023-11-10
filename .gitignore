@@ -8,3 +8,4 @@ env
 __pycache__
  .env
 .env_local
+template_test.py 
