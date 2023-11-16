@@ -8,10 +8,5 @@ target_app_env:
 
 deploy_type: job
 target_app_name: example_job
-#target_image_tag: 0.0.1
 job_interval: "5 8 * * 0"
 job_command: ['ls','-ltra']
-#target_image_tag: 0.0.1
-target_stack: dev
-# job_description: 1xmonth-prod
-# target_memory_mb: 256
