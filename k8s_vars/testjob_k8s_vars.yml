@@ -1,0 +1,6 @@
+deploy_type: job
+target_image_registry: docker.io
+target_app_name: busybox
+target_image_tag: 1.28
+job_interval: "* * * * *"
+job_command: ['ls','-ltra']

@@ -2,7 +2,7 @@
 
 import os
 import argparse
-from k8sdeploy.k8sdeploy import KubernetesDeploy
+from k8sdeploy.k8sdeploy import KubernetesDeploy, EksUpateConfig
 
 class UserNamespace(object):
     """ Arg Parser class """
@@ -12,7 +12,7 @@ def main():
     user_namespace = UserNamespace()
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-s","--stack", type=str,default="dev",
-                        help="stack(default='dev')")
+                        help="stack(prod,stage,dev or sand) default='dev'")
     
     parser.add_argument("-a","--action", type=str,default="apply",
                         help="Action verb: create, delete, apply (default='apply')")
@@ -28,6 +28,13 @@ def main():
     parser1.add_argument("-e","--ecr-account", type=str, 
                         default=f"{os.getenv('ECR_ACCOUNT_ID','')}",
                         help="""ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'""")
+    parser1.add_argument("-u","--update-eks-config", type=str, 
+                        default="",
+                        help="""Update EKS CIDRs: Github runner IP4 address to either add or remove """)
     args=parser1.parse_args()
-    deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)
-    deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
+    if args.update_eks_config:
+        eks_update=EksUpateConfig(args.stack,args.update_eks_config)
+        eks_update.update_config(args.action)
+    else:
+        deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)
+        deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
