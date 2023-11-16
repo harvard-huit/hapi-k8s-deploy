@@ -17,7 +17,7 @@ spec:
 {%- endif %}
           containers:
           - name: {{ target_app_name }}
-            image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_release_tag or target_image_tag or target_stack }}
+            image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
             imagePullPolicy: Always
 {%- if job_command %}
             command: {{job_command | safe }}
