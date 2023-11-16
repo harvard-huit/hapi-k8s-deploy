@@ -10,11 +10,12 @@ from contextlib import contextmanager
 from botocore.exceptions import ClientError, NoCredentialsError
 from subprocess import run, check_output
 from six import b
+from time import sleep
 
 class KubernetesDeploy():
-    def __init__(self,var_filename,stack,ecr_account_id,release_tag):
+    def __init__(self,var_filename,stack,ecr_account_id):
         self.stack=stack
-        self.release_tag=release_tag
+        #self.release_tag=release_tag
         self.default_path=f"{os.path.dirname(os.path.abspath(__file__))}"
         self.account=""
         self.vars=self.__deploy_data__(var_filename,ecr_account_id)
@@ -26,7 +27,7 @@ class KubernetesDeploy():
         # manual inputs
         var_data['ecr_account_id'] = ecr_account_id
         var_data['target_stack']=self.stack
-        var_data['target_release_tag'] = self.release_tag[1:] if self.release_tag.lower().startswith('v') else self.release_tag
+        #var_data['target_release_tag'] = self.release_tag[1:] if self.release_tag.lower().startswith('v') else self.release_tag
         # secrets and config map vars
         secret_cm=self.generate_secret_configmap_data(var_data)
         data = secret_cm | var_data
@@ -202,3 +203,47 @@ class KubernetesDeploy():
                 self.deployment_rollout_restart()
         elif self.vars['deploy_type'].lower() in ['job','cronjob']:
             self.load_deploy("jobs",action)
+
+class EksUpateConfig():
+    def __init__(self,stack: str,github_runner_ip: str):
+        self.stack=stack
+        #self.action=action
+        self.cluster_name=f"adexk8s-eks-cluster-{self.stack}"
+        self.ip4 = github_runner_ip
+        self.eks=boto3.client('eks')
+
+    @contextmanager
+    def disable_exception_traceback(self):
+        """
+        All traceback information is suppressed and only the exception type and value are printed
+        """
+        default_value = getattr(sys, "tracebacklimit", 1000)  # `1000` is a Python's default value
+        sys.tracebacklimit = 0
+        yield
+        sys.tracebacklimit = default_value  # revert changes
+
+    def get_cluster_config(self):
+        attempts=0
+        wait=True
+        while wait: 
+            cluster=self.eks.describe_cluster(name=self.cluster_name)
+            if cluster['cluster']['status'] !='ACTIVE':
+                sleep(10)
+                if attempts >30:
+                    with self.disable_exception_traceback():
+                        raise Exception("EKS Cluster is not ready! Thirty tries and waited for 5 minutes. Please retry later.")
+            else:
+                wait=False
+            attempts += 1
+        return  cluster['cluster']['resourcesVpcConfig']
+    
+    def update_config(self,action: str):
+        #eks = boto3.client('eks')
+        resources_vpc_config= self.get_cluster_config()
+        if action.lower() != 'delete':
+            resources_vpc_config['publicAccessCidrs'].append(f"{self.ip4}/32")
+        else:
+            if f"{self.ip4}/32" in resources_vpc_config['publicAccessCidrs']:
+                resources_vpc_config['publicAccessCidrs'].remove(f"{self.ip4}/32")
+        self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
+        return resources_vpc_config
