@@ -12,7 +12,7 @@ def main():
     user_namespace = UserNamespace()
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-s","--stack", type=str,default="dev",
-                        help="stack(default='dev')")
+                        help="stack(prod,stage,dev or sand) default='dev'")
     
     parser.add_argument("-a","--action", type=str,default="apply",
                         help="Action verb: create, delete, apply (default='apply')")
