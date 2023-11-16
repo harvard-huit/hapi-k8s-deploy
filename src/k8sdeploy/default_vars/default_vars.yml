@@ -4,6 +4,7 @@ target_image_registry: {{ ecr_account_id }}.dkr.ecr.us-east-1.amazonaws.com
 target_image_name: {{ target_app_name }}
 target_image_tag: ''
 target_replica_count: 3
+target_namespace: default
 # Ingress
 # Default to not create Ingress
 create_ingress: False
