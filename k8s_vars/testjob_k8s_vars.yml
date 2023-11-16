@@ -1,12 +1,6 @@
-target_app_secrets_ref:
-  - PDS_API_KEY: adex-vectorsolution-pds-api-key
-    SLACK_API_KEY: adex-apigee-backup-slack-api-key
-    VSOLUTION_CLIENT_SECRET: vector-solutions-client-key
-target_app_env:
-  - name: EXAMPLE_ID
-    value: EXAMPLE1
-
 deploy_type: job
-target_app_name: example_job
-job_interval: "5 8 * * 0"
+target_image_registry: docker.io
+target_app_name: busybox
+target_image_tag: 1.28
+job_interval: "* * * * *"
 job_command: ['ls','-ltra']
