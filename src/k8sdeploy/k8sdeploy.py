@@ -15,7 +15,6 @@ from time import sleep
 class KubernetesDeploy():
     def __init__(self,var_filename,stack,ecr_account_id):
         self.stack=stack
-        #self.release_tag=release_tag
         self.default_path=f"{os.path.dirname(os.path.abspath(__file__))}"
         self.account=""
         self.vars=self.__deploy_data__(var_filename,ecr_account_id)
@@ -27,12 +26,10 @@ class KubernetesDeploy():
         # manual inputs
         var_data['ecr_account_id'] = ecr_account_id
         var_data['target_stack']=self.stack
-        #var_data['target_release_tag'] = self.release_tag[1:] if self.release_tag.lower().startswith('v') else self.release_tag
         # secrets and config map vars
         secret_cm=self.generate_secret_configmap_data(var_data)
         data = secret_cm | var_data
         data = self.load_defaults('default_vars.yml',data) | data 
-        #data = self.read_variable_file('k8s_vars/default_vars.yml') | data
         data=self.get_cert_arn(data)
         data=self.get_tag_data(data)
         d=data.pop("target_app_secrets_ref",None)
@@ -207,7 +204,6 @@ class KubernetesDeploy():
 class EksUpateConfig():
     def __init__(self,stack: str,github_runner_ip: str):
         self.stack=stack
-        #self.action=action
         self.cluster_name=f"adexk8s-eks-cluster-{self.stack}"
         self.ip4 = github_runner_ip
         self.eks=boto3.client('eks')
@@ -238,7 +234,6 @@ class EksUpateConfig():
         return  cluster['cluster']['resourcesVpcConfig']
     
     def update_config(self,action: str):
-        #eks = boto3.client('eks')
         resources_vpc_config= self.get_cluster_config()
         if action.lower() != 'delete':
             resources_vpc_config['publicAccessCidrs'].append(f"{self.ip4}/32")
