@@ -6,20 +6,32 @@ metadata:
 spec:
 {%- if job_interval %}     
   schedule: "{{ job_interval }}"
+  concurrencyPolicy: {{ concurrency_policy }}
 {%- endif %}  
   {{ 'jobTemplate' if job_interval else 'template' }}:
-    backoffLimit: {{ backoff_limit }}
+{%- if job_interval %}
     spec:
       template:
         spec:
-{%- if job_interval %}     
-          concurrencyPolicy: {{ concurrency_policy }}
-{%- endif %}
           containers:
           - name: {{ target_app_name }}
             image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
             imagePullPolicy: Always
 {%- if job_command %}
             command: {{job_command | safe }}
-{%- endif -%}
+{%- endif %}
           restartPolicy: {{ restart_policy }}
+      backoffLimit: {{ backoff_limit }}
+{%- endif %}
+{%- if not job_interval %}
+    spec:
+      containers:
+      - name: {{ target_app_name }}
+        image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
+        imagePullPolicy: Always
+{%- if job_command %}
+        command: {{job_command | safe }}
+{%- endif %}
+      restartPolicy: {{ restart_policy }}
+  backoffLimit: {{ backoff_limit }}
+{%- endif %}
