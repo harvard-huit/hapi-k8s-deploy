@@ -153,8 +153,23 @@ class KubernetesDeploy():
         template_env=jinja2.Environment(loader=templateLoader, autoescape=True)
         template=template_env.get_template(f"{template_name}.j2")
         return template.render(**data)
-
-    def load_deploy(self,template,action):
+    
+    def wait_api_availability(self):
+        attempts=0
+        wait=True
+        while wait: 
+            cluster=self.eks.describe_cluster(name=self.cluster_name)
+            if cluster['cluster']['status'] !='ACTIVE':
+                sleep(10)
+                if attempts >30:
+                    with self.disable_exception_traceback():
+                        raise Exception("EKS Cluster is not ready! Waited for 5 minutes and still unavailable. Please retry later.")
+            else:
+                wait=False
+            attempts += 1
+        return  cluster['cluster']['resourcesVpcConfig']
+    
+    def load_deploy(self,template,action):     
         try:
             rendered=self.load_template(template,self.vars)
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
@@ -181,9 +196,13 @@ class KubernetesDeploy():
              "-n", f"{self.vars['target_namespace']}"])
         
     def deploy_objects(self,action="apply",delete_namespace=False):
+        # First double check API is Ready after adding 
+        # GH Runner Ip4 to cluster config 
+        self.wait_api_availability()
+        # Check AWS Token
         self.checkAWSToken(self.vars['ecr_account_id'])
+        # Deploy k8s objects
         if self.vars['deploy_type'].lower() == 'api':
-            # Deploy k8s objects
             if action != "delete":
                 self.load_deploy("namespace",action)
             if self.vars['secret']:
