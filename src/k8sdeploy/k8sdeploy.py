@@ -20,6 +20,7 @@ class KubernetesDeploy():
         self.vars=self.__deploy_data__(var_filename,ecr_account_id)
         self.rollout_restart=False
         self.eks=boto3.client('eks')
+        self.cluster_name=f"adexk8s-eks-cluster-{self.stack}"
 
     def __deploy_data__(self,filename,ecr_account_id):
         self.checkAWSToken(ecr_account_id)
