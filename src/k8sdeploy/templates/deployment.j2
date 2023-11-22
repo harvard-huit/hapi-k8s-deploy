@@ -17,8 +17,10 @@ spec:
       - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
         imagePullPolicy: Always
         name: {{ target_app_name }}
+        {% if target_app_port -%}
         ports:
         - containerPort: {{ target_app_port }}
+        {%- endif -%}
         {% if secret or configmap -%}
         envFrom:
 {%- if secret %}     
@@ -30,4 +32,35 @@ spec:
             name: {{ target_app_name }}-cm
 {%- endif -%}
 {%- endif -%}
+{% if target_volume_mount -%}
+        volumeMounts:
+        {% for itm in target_volume_mount -%}
+        - name: {{ itm.name }}
+          mountPath: {{ itm.mount_path }} 
+        {% endfor -%}
+{% endif -%}
+{% if target_volume_mount -%}
+      {%- if target_volume_mount +%}
+      volumes:
+      {%- for itm in target_volume_mount %}
+      - name: {{ itm.name }}
+        {{ itm.type }}:
+          {% if itm.type.lower() == 'secret' -%}
+          secretName: {{ itm.secret_name  or target_app_name + "-secret" }}
+          {% endif -%}
+          {% if itm.type.lower() == 'configmap' -%}
+          configmapName: {{  itm.configmap_name if itm.configmap_name else target_app_name + "-cm" }}
+          {% endif -%}
+          defaultMode: {{ default_mode }}
+          items:
+            {% for itms in itm.data_items -%}
+            - key: {{ itms.key }}
+              mode: {{ itms.mode or default_mode }}
+              path: {{ itms.path }}
+            {% endfor -%}
+      {%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+
+
 

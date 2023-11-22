@@ -5,6 +5,8 @@ target_image_name: {{ target_app_name }}
 target_image_tag: ''
 target_replica_count: 3
 target_namespace: default
+# Service default create
+create_service: True
 # Ingress
 # Default to not create Ingress
 create_ingress: False
@@ -24,3 +26,6 @@ job_interval: ''
 restart_policy: OnFailure
 backoff_limit: 6
 concurrency_policy: Allow
+
+# Volume Mount
+default_mode: 420

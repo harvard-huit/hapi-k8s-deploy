@@ -212,7 +212,8 @@ class KubernetesDeploy():
             if self.vars['configmap']:
                 self.load_deploy("configmap",action)
             self.load_deploy("deployment",action)
-            self.load_deploy("service",action)
+            if self.vars['create_service']:
+                self.load_deploy("service",action)
             if self.vars['create_ingress']:
                 self.load_deploy("ingress",action)
             if action=="delete" and delete_namespace:
