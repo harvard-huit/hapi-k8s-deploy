@@ -32,7 +32,7 @@ spec:
             name: {{ target_app_name }}-cm
 {%- endif -%}
 {%- endif -%}
-{% if target_volume_mount -%}
+{% if target_volume_mount %}
         volumeMounts:
         {% for itm in target_volume_mount -%}
         - name: {{ itm.name }}
