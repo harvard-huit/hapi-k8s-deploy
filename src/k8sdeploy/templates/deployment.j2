@@ -21,9 +21,9 @@ spec:
         ports:
         - containerPort: {{ target_app_port }}
         {%- endif -%}
-        {% if secret or configmap -%}
+        {% if secret or configmap %}
         envFrom:
-{%- if secret %}     
+{% if secret %}     
         - secretRef:
             name: {{ target_app_name }}-secret
 {%- endif -%}
