@@ -1,0 +1,72 @@
+target_app_secrets_ref:
+  - HAPI_CELERY_CONFIG: hapi-celery-config
+    APIGEE_POC_DEV_SA: hapi-apigee-x-poc-dev-admin-sa
+    APIGEE_POC_TEST_SA: hapi-apigee-x-poc-test-admin-sa
+    CLIENT_KEY_PEM: hapi-rabbitmq-client-key
+    CLIENT_CERT_PEM: hapi-rabbitmq-client-cert
+    TESTCA_CACERT_PEM: hapi-celery-testca-cert
+    CLIENT_MONGO_PEM: hapi-mongodb-client-cert
+
+target_app_env:
+  - name: BROKER_USE_SSL
+    value: "True"
+  - name: CELERY_IMPORTS
+    value: hapi-apigee-toolq
+  - name: CELERY_QUEUE
+    value: hapi-tools
+  - name: LOG_LEVEL
+    value: INFO
+  - name: MONGO_DB
+    value: cybercom
+  - name: MONGO_HOST
+    value: cybercom-mongo.sand-cybercom.svc.cluster.local
+  - name: MONGO_LOG_COLLECTION
+    value: task_log
+  - name: MONGO_PORT
+    value: 27017
+  - name: MONGO_TOMBSTONE_COLLECTION
+    value: tombstone
+  - name: RABBITMQ_HOST
+    value: cybercom-rabbitmq.sand-cybercom.svc.cluster.local
+  - name: RABBITMQ_PORT
+    value: 5671
+  - name: RABBITMQ_SSL_CA_FILE
+    value: /ssl/testca/cacert.pem
+  - name: RABBITMQ_SSL_CERT_FILE
+    value: /ssl/server/cert.pem
+  - name: RABBITMQ_SSL_KEY_FILE
+    value: /ssl/server/key.pem
+  - name: SSL_PATH
+    value: /ssl
+  - name: MONGO_USERNAME
+    value: muser
+  - name: RABBITMQ_DEFAULT_USER
+    value: ruser
+  - name: RABBITMQ_DEFAULT_VHOST
+    value: rhost
+
+target_volume_mount:
+  - name: ssl-keys
+    mount_path: /ssl
+    type: secret
+    data_items:
+      - key: CLIENT_CERT_PEM
+        path: client/cert.pem
+      - key: CLIENT_KEY_PEM
+        path: client/key.pem
+      - key: TESTCA_CACERT_PEM
+        path: testca/cacert.pem
+      - key: CLIENT_MONGO_PEM
+        path: client/mongodb.pem
+  - name: apigee-auth
+    mount_path: /xkeys
+    type: secret
+    data_items:
+      - key: apigee-x-poc-dev
+        path: apigee-x-poc-dev.json
+      - key: apigee-x-poc-test
+        path: apigee-x-poc-test.json
+
+target_namespace: celery-workers
+target_app_name: hapi-toolsq
+create_service: False
