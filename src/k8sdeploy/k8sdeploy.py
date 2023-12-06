@@ -262,5 +262,12 @@ class EksUpateConfig():
         else:
             if f"{self.ip4}/32" in resources_vpc_config['publicAccessCidrs']:
                 resources_vpc_config['publicAccessCidrs'].remove(f"{self.ip4}/32")
-        self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
+        try:
+            self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
+        except self.eks.exceptions.InvalidParameterException as e:
+            # parameters should be correct unless Cluster is already at the desired configuration
+            if "Cluster is already at the desired configuration" in e:
+                print(e)
+            else:
+                raise e
         return resources_vpc_config
