@@ -271,10 +271,13 @@ class EksUpateConfig():
                 wait=False
             except self.eks.exceptions.InvalidParameterException as e:
                 # parameters should be correct unless Cluster is already at the desired configuration
-                print(e)
+                if "Cluster is already at the desired configuration" in str(e):
+                    print("Cluster is already at the desired configuration")
+                    wait=False
             except self.eks.exceptions.ResourceInUseException as e:
                 print("ResourceInUseException")
-            if attempts >5:
+                sleep(30)
+            if attempts >10:
                 with self.disable_exception_traceback():
                     raise Exception(f"Attempting to {action} GH Runner IP. Please double check IP: {self.ip4} access on {self.cluster_name}")
             attempts += 1
