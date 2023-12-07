@@ -271,8 +271,7 @@ class EksUpateConfig():
                 wait=False
             except self.eks.exceptions.InvalidParameterException as e:
                 # parameters should be correct unless Cluster is already at the desired configuration
-                if "Cluster is already at the desired configuration" in e:
-                    print("Cluster is already at the desired configuration")
+                print(e)
             except self.eks.exceptions.ResourceInUseException as e:
                 print("ResourceInUseException")
             if attempts >5:
