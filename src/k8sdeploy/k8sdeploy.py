@@ -262,6 +262,7 @@ class EksUpateConfig():
             resources_vpc_config= self.get_cluster_config()
             if action.lower() != 'delete':
                 resources_vpc_config['publicAccessCidrs'].append(f"{self.ip4}/32")
+                resources_vpc_config['publicAccessCidrs']=list(set(resources_vpc_config['publicAccessCidrs']))
             else:
                 if f"{self.ip4}/32" in resources_vpc_config['publicAccessCidrs']:
                     resources_vpc_config['publicAccessCidrs'].remove(f"{self.ip4}/32")
@@ -272,11 +273,10 @@ class EksUpateConfig():
                 # parameters should be correct unless Cluster is already at the desired configuration
                 if "Cluster is already at the desired configuration" in e:
                     print("Cluster is already at the desired configuration")
-                    wait=False
             except self.eks.exceptions.ResourceInUseException as e:
                 print("ResourceInUseException")
             if attempts >5:
                 with self.disable_exception_traceback():
-                    raise Exception(f"Attempting to {action} GH Runner IP. Please double check IP: {self.ip4}")
+                    raise Exception(f"Attempting to {action} GH Runner IP. Please double check IP: {self.ip4} access on {self.cluster_name}")
             attempts += 1
         return resources_vpc_config
