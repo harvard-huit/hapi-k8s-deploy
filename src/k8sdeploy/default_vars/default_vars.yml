@@ -29,3 +29,8 @@ concurrency_policy: Allow
 
 # Volume Mount
 default_mode: 420
+
+# Sidecar
+sidecar_name: 'sidecar'
+sidecar_image: ''
+sidecar_pull_policy: IfNotPresent

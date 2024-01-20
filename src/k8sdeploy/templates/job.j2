@@ -20,6 +20,16 @@ spec:
 {%- if job_command %}
             command: {{job_command | safe }}
 {%- endif %}
+{%- if sidecar_image %}
+          - name: {{ sidecar_name }}
+            image: {{ sidecar_image }}:{{ sidecar_tag }}
+            imagePullPolicy: {{ sidecar_pull_policy }}
+{%- if sidecar_command %}
+            command: {{sidecar_command | safe }}
+{%- endif %}
+          ports:
+          - containerPort: {{ sidecar_port }}
+{%- endif %}
           restartPolicy: {{ restart_policy }}
       backoffLimit: {{ backoff_limit }}
 {%- endif %}
