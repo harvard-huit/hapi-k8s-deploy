@@ -221,7 +221,7 @@ class KubernetesDeploy():
             if self.rollout_restart:
                 self.deployment_rollout_restart()
         elif self.vars['deploy_type'].lower() in ['job','cronjob']:
-            self.load_deploy("jobs",action)
+            self.load_deploy("job",action)
 
 class EksUpateConfig():
     def __init__(self,stack: str,github_runner_ip: str):
