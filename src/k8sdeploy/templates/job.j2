@@ -13,10 +13,22 @@ spec:
     spec:
       template:
         spec:
+          shareProcessNamespace: true
           containers:
           - name: {{ target_app_name }}
-            image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
+            image: "{{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}"
             imagePullPolicy: Always
+            {% if secret or configmap %}
+            envFrom:
+{% if secret %}     
+            - secretRef:
+                name: {{ target_app_name }}-secret
+{%- endif -%}
+{% if configmap %}
+            - configMapRef:
+                name: {{ target_app_name }}-cm
+{%- endif -%}
+{%- endif -%}
 {%- if job_command %}
             command: {{job_command | safe }}
 {%- endif %}
@@ -24,11 +36,17 @@ spec:
           - name: {{ sidecar_name }}
             image: {{ sidecar_image }}:{{ sidecar_tag }}
             imagePullPolicy: {{ sidecar_pull_policy }}
+            ports:
+            - containerPort: {{ sidecar_port }}
 {%- if sidecar_command %}
             command: {{sidecar_command | safe }}
 {%- endif %}
-          ports:
-          - containerPort: {{ sidecar_port }}
+            securityContext:
+              capabilities:
+                add:
+                - SYS_PTRACE
+            stdin: true
+            tty: true     
 {%- endif %}
           restartPolicy: {{ restart_policy }}
       backoffLimit: {{ backoff_limit }}
@@ -42,6 +60,6 @@ spec:
 {%- if job_command %}
         command: {{job_command | safe }}
 {%- endif %}
-      restartPolicy: {{ restart_policy }}
+      restartPolicy: {{ restart_policy }}      
   backoffLimit: {{ backoff_limit }}
 {%- endif %}

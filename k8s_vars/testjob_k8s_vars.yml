@@ -1,6 +1,18 @@
+target_app_secrets_ref:
+  - APIGEE_MACHINE_PASSWORD: apigee-nonprod-common@harvard.edu
+    PORTAL_PASSWORD: apigee-portal-team-password
+    X_API_KEY: hapi-apigee-taskqueue-x-api-key
+target_app_env:
+  - name: APIGEE_MACHINE_USERNAME
+    value: apigee-nonprod-common@harvard.edu
+  - name: PORTAL_USERNAME
+    value: apiops@calists.harvard.edu
 deploy_type: job
-target_image_registry: docker.io
-target_app_name: busybox
-target_image_tag: 1.28
-job_interval: "* * * * *"
-job_command: ['ls','-ltra']
+target_app_name: hapi-team-migration-job
+target_namespace: migration-jobs
+job_interval: "*/20 * * * *"
+restart_policy: Never
+sidecar_name: selenium
+sidecar_image: docker.io/selenium/standalone-chrome
+sidecar_tag: "4.16.1"
+sidecar_port: 4444
