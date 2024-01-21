@@ -174,6 +174,7 @@ class KubernetesDeploy():
     def load_deploy(self,template,action):     
         try:
             rendered=self.load_template(template,self.vars)
+            print(rendered)
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
                 temp_file.write(rendered)
             if template == "deployment":
@@ -203,25 +204,28 @@ class KubernetesDeploy():
         self.wait_api_availability()
         # Check AWS Token
         self.checkAWSToken(self.vars['ecr_account_id'])
+        # Namespace
+        if action != "delete":
+            self.load_deploy("namespace",action)
+        # secrets and configmaps
+        if self.vars['secret']:
+            self.load_deploy("secret",action)
+        if self.vars['configmap']:
+            self.load_deploy("configmap",action)
         # Deploy k8s objects
         if self.vars['deploy_type'].lower() == 'api':
-            if action != "delete":
-                self.load_deploy("namespace",action)
-            if self.vars['secret']:
-                self.load_deploy("secret",action)
-            if self.vars['configmap']:
-                self.load_deploy("configmap",action)
             self.load_deploy("deployment",action)
             if self.vars['create_service']:
                 self.load_deploy("service",action)
             if self.vars['create_ingress']:
                 self.load_deploy("ingress",action)
-            if action=="delete" and delete_namespace:
-                self.load_deploy("namespace",action)
             if self.rollout_restart:
                 self.deployment_rollout_restart()
         elif self.vars['deploy_type'].lower() in ['job','cronjob']:
             self.load_deploy("job",action)
+        # namespace delete
+        if action=="delete" and delete_namespace:
+            self.load_deploy("namespace",action)
 
 class EksUpateConfig():
     def __init__(self,stack: str,github_runner_ip: str):
