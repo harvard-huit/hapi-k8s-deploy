@@ -174,7 +174,6 @@ class KubernetesDeploy():
     def load_deploy(self,template,action):     
         try:
             rendered=self.load_template(template,self.vars)
-            print(rendered)
             with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
                 temp_file.write(rendered)
             if template == "deployment":
