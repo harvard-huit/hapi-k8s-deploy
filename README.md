@@ -54,7 +54,7 @@ Must be logged into the appropriate AWS account for secrets  `stack/secretname` 
 
 Variable | Type | Description | Default Value
 -------- | ---- | ----------- | -------------
-deploy_type| string|deploy type: api,cronjob| api
+deploy_type| string|deploy type: api,job,cronjob| api
 target_namespace| string | Required field - Kubernetes namespace | default
 target_app_name | string | Required field with application name (Alphanumeric with dash separator) |
 target_app_port | int | required field - port exposed within container |
@@ -72,6 +72,7 @@ successful_response_codes| string | Optional field if create_ingress is True - H
 ingress_load_balancer_name | string | Required Field if create_ingress is True - Name of AWS ALB | 
 ingress_group_name | string | Application Load Balancer group, combine multiple applications within one ALB | ingress_load_balancer_name
 ingress_inbound_security_groups | string | Inbound Security group Ids | Apigee Edge IPs and DMSDEVOPS Tunnel
+create_service | string | deploy a service | true
 
 ## Variables Job/CronJob 
 deploy_type=job or cronjob
