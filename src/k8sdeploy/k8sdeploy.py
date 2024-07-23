@@ -30,12 +30,14 @@ class KubernetesDeploy():
         var_data['target_stack']=self.stack
         # secrets and config map vars
         secret_cm=self.generate_secret_configmap_data(var_data)
-        data = secret_cm | var_data
-        data = self.load_defaults('default_vars.yml',data) | data 
+        data = secret_cm | var_data 
         data=self.get_cert_arn(data)
         data=self.get_tag_data(data)
+        data = self.load_defaults('default_vars.yml',data) | data
+        data = self.set_ingress_tag_data(data)
         d=data.pop("target_app_secrets_ref",None)
         d=data.pop("target_app_env",None)
+        d=data.pop("ingress_additional_tags",None)
         return data
             
     def load_defaults(self,filename,data):
@@ -45,6 +47,26 @@ class KubernetesDeploy():
         template=template_env.get_template(filename)
         return yaml.safe_load(template.render(**data))
 
+    def set_ingress_tag_data(self,var_data):
+        if var_data['ingress_additional_tags']:
+            # Default tags
+            default_tags=var_data['ingress_tags'].split(",")
+            try:
+                default_tags=dict(t.split("=") for t in map(str.strip, default_tags))
+            except:
+                default_tags=dict(t.split(":") for t in map(str.strip, default_tags))
+            # Additional tags
+            additonal_tags=var_data['ingress_additional_tags'].split(",")
+            try:
+                additonal_tags=dict(t.split("=") for t in map(str.strip, additonal_tags))
+            except:
+                additonal_tags=dict(t.split(":") for t in map(str.strip, additonal_tags))            
+            # Merge tags
+            tags=default_tags | additonal_tags
+            tags_string=",".join([f"{key}={value}" for key, value in tags.items()])
+            var_data['ingress_tags']=tags_string
+        return var_data
+    
     def get_tag_data(self, var_data):
         lookup={"dev":"Development","prod":"Production","stage":"Stage","sand":"Development"}
         var_data['stack']=self.stack
