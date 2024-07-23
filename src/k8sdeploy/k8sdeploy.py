@@ -48,18 +48,15 @@ class KubernetesDeploy():
         return yaml.safe_load(template.render(**data))
 
     def set_ingress_tag_data(self,var_data):
-        default_tags=var_data['ingress_tags'].split(",")
-        default_tags=dict(t.split("=") for t in map(str.strip, default_tags))
-        default_tags=var_data['ingress_tags'].split(",")
         if var_data['ingress_additional_tags']:
-            default_tags=var_data['ingress_tags'].split(",")
             # Default tags
+            default_tags=var_data['ingress_tags'].split(",")
             try:
                 default_tags=dict(t.split("=") for t in map(str.strip, default_tags))
             except:
                 default_tags=dict(t.split(":") for t in map(str.strip, default_tags))
-            additonal_tags=var_data['ingress_additional_tags'].split(",")
             # Additional tags
+            additonal_tags=var_data['ingress_additional_tags'].split(",")
             try:
                 additonal_tags=dict(t.split("=") for t in map(str.strip, additonal_tags))
             except:
