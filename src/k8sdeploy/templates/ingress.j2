@@ -12,7 +12,7 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-path: {{ ingress_health_check_path }}
     alb.ingress.kubernetes.io/success-codes: "{{ successful_response_codes }}"
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
-    alb.ingress.kubernetes.io/tags: Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb
+    alb.ingress.kubernetes.io/tags: {{ ingress_tags }}
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/backend-protocol: {{ aws_load_balancer_backend_protocol }}
     alb.ingress.kubernetes.io/certificate-arn: {{ aws_load_balancer_ssl_cert }}
