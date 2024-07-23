@@ -73,6 +73,8 @@ successful_response_codes| string | Optional field if create_ingress is True - H
 ingress_load_balancer_name | string | Required Field if create_ingress is True - Name of AWS ALB | 
 ingress_group_name | string | Application Load Balancer group, combine multiple applications within one ALB | ingress_load_balancer_name
 ingress_inbound_security_groups | string | Inbound Security group Ids | Apigee Edge IPs and DMSDEVOPS Tunnel
+ingress_tags | string | Comma separated string of default tags added to ingress | "Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb"
+ingress_additional_tags | string | additional tags you want added to ingress | ''
 
 ## Variables Job/CronJob 
 deploy_type=job or cronjob
