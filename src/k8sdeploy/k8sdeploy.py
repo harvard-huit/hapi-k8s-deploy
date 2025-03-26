@@ -47,12 +47,11 @@ class KubernetesDeploy():
         """
         if "target_app_env" in val.keys():
             if "VERSION" in val["target_app_env"]:
-                target_image_tag=val["target_app_env"]["VERSION"]  
-        elif val.get('target_image_tag', ''):
-            target_image_tag=val['target_image_tag']
+                return val["target_app_env"]["VERSION"]  
+        if val.get('target_image_tag', ''):
+            return val['target_image_tag']
         else:
-            target_image_tag=target_stack
-        return target_image_tag
+            return target_stack
             
     def load_defaults(self,filename,data):
         path=f"{self.default_path}/default_vars"
