@@ -46,8 +46,9 @@ class KubernetesDeploy():
             get target_image_tag 
         """
         if "target_app_env" in val.keys():
-            if "VERSION" in val["target_app_env"]:
-                return val["target_app_env"]["VERSION"]  
+            for itm in val["target_app_env"]:
+                if itm['name'] == "VERSION":
+                    return itm['value']
         if val.get('target_image_tag', ''):
             return val['target_image_tag']
         else:
