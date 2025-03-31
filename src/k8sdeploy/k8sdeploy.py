@@ -28,6 +28,7 @@ class KubernetesDeploy():
         # manual inputs
         var_data['ecr_account_id'] = ecr_account_id
         var_data['target_stack']=self.stack
+        var_data['target_image_tag']=self.get_target_image_tag(var_data,self.stack)
         # secrets and config map vars
         secret_cm=self.generate_secret_configmap_data(var_data)
         data = secret_cm | var_data 
@@ -39,6 +40,19 @@ class KubernetesDeploy():
         d=data.pop("target_app_env",None)
         d=data.pop("ingress_additional_tags",None)
         return data
+    
+    def get_target_image_tag(self,val,target_stack):
+        """
+            get target_image_tag 
+        """
+        if "target_app_env" in val.keys():
+            for itm in val["target_app_env"]:
+                if itm['name'] == "VERSION":
+                    return itm['value']
+        if val.get('target_image_tag', ''):
+            return val['target_image_tag']
+        else:
+            return target_stack
             
     def load_defaults(self,filename,data):
         path=f"{self.default_path}/default_vars"
