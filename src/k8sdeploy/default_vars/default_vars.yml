@@ -14,7 +14,7 @@ aws_load_balancer_backend_protocol: HTTPS
 ingress_group_order: '0'
 ingress_inbound_security_groups: sg-0d3081250fed98f00,sg-087fd3cc5c488e2db
 ingress_tags: "Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb"
-ingress_additional_tags: ''
+ingress_additional_tags: 'waf-type=exception-alb,waf-custom=exclude-xss,waf-exception-request=INC05865698-INC05634592'
 # Ingress group defaults to ingress_load_balancer_name
 ingress_path: /
 ingress_group_name: {{ ingress_load_balancer_name }}
