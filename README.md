@@ -62,7 +62,7 @@ target_image_name| string | Optional image name of ECR image | target_app_name
 target_image_tag | string | Required field - Specific image tag within ECR | 
 target_app_secrets_ref | json | Optional AWS Secrets Manager secret references |
 target_app_env | json | Optional environment values to pass to the container |
-target_memory_mb | int | Memory allocated to the container | Not used currently
+target_memory_mb | int | Deprecated / not used. See Resource Constraints section below. |
 target_replica_count | int | Optional field - Desired container count | 3
 create_ingress | string | Optional Boolean | true
 create_service | string | deploy a service | true
@@ -75,6 +75,28 @@ ingress_group_name | string | Application Load Balancer group, combine multiple 
 ingress_inbound_security_groups | string | Inbound Security group Ids | Apigee Edge IPs and DMSDEVOPS Tunnel
 ingress_tags | string | Comma separated string of default tags added to ingress | "Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb"
 ingress_additional_tags | string | additional tags you want added to ingress | ''
+
+## Resource Constraints
+deploy_type=api
+
+Opt-in CPU/memory requests and limits on the container. **Backward compatible:** if `target_set_resources` is left `False` (the default), the rendered Deployment is unchanged (no `resources` block). Set it to `True` to apply constraints; any sub-value you omit falls back to the default below.
+
+By design only a **memory limit** is set — a CPU limit is omitted unless you explicitly set `target_cpu_limit`, since CPU limits cause throttling on busy services. CPU is requested (for scheduling/QoS) but not capped.
+
+Variable | Type | Description | Default Value
+-------- | ---- | ----------- | -------------
+target_set_resources | boolean | Master switch. When False, no `resources` block is rendered (legacy behavior). | False
+target_cpu_request | string | CPU request (e.g. `100m`, `1`). | 100m
+target_memory_request_mb | int | Memory request in MiB. | 256
+target_memory_limit_mb | int | Memory limit in MiB. | 512
+target_cpu_limit | string | Optional CPU limit (e.g. `2`). Omitted entirely when empty. | '' (none)
+
+Example (in your `{stack}_k8s_vars.yml`):
+
+        target_set_resources: True
+        target_cpu_request: "500m"
+        target_memory_request_mb: 512
+        target_memory_limit_mb: 1024
 
 ## Variables Job/CronJob 
 deploy_type=job or cronjob

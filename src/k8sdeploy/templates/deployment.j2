@@ -17,6 +17,17 @@ spec:
       - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
         imagePullPolicy: Always
         name: {{ target_app_name }}
+{% if target_set_resources %}
+        resources:
+          requests:
+            cpu: "{{ target_cpu_request }}"
+            memory: "{{ target_memory_request_mb }}Mi"
+          limits:
+            memory: "{{ target_memory_limit_mb }}Mi"
+{% if target_cpu_limit %}
+            cpu: "{{ target_cpu_limit }}"
+{% endif %}
+{% endif %}
         {% if target_app_port -%}
         ports:
         - containerPort: {{ target_app_port }}
