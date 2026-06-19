@@ -5,6 +5,15 @@ target_image_name: {{ target_app_name }}
 target_image_tag: ''
 target_replica_count: 3
 target_namespace: default
+# Resource constraints (opt-in, backward compatible).
+# Leave target_set_resources False to render exactly as before (no resources block).
+# Set it True to apply requests/limits; unset sub-values fall back to these defaults.
+# CPU limit is intentionally omitted by default to avoid throttling; set target_cpu_limit to add one.
+target_set_resources: False
+target_cpu_request: 100m
+target_memory_request_mb: 256
+target_memory_limit_mb: 512
+target_cpu_limit: ''
 # Service default create
 create_service: True
 # Ingress
