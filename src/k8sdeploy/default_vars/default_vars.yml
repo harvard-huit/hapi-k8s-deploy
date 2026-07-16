@@ -44,3 +44,9 @@ default_mode: 420
 sidecar_name: 'sidecar'
 sidecar_image: ''
 sidecar_pull_policy: IfNotPresent
+# Extra sidecar containers (opt-in). Empty by default so deployments that do not
+# set target_sidecars render exactly as before. Each entry supports:
+#   name, image (or repo+tag prefixed with target_image_registry), pull_policy,
+#   args (list), ports (list of {container_port, name, protocol}),
+#   set_resources + cpu_request/memory_request_mb/memory_limit_mb.
+target_sidecars: []

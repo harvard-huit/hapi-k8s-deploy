@@ -50,6 +50,42 @@ spec:
           mountPath: {{ itm.mount_path }} 
         {% endfor -%}
 {% endif -%}
+{#- Additional sidecar containers. Opt-in: renders nothing unless target_sidecars is set, #}
+{#- so existing deployments are unaffected. Control tags are kept at column 0 so they #}
+{#- inject only harmless blank lines and never disturb content indentation. #}
+{% if target_sidecars %}
+{% for sidecar in target_sidecars %}
+      - name: {{ sidecar.name }}
+        image: {{ sidecar.image if sidecar.image else target_image_registry + '/' + sidecar.repo + ':' + sidecar.tag }}
+        imagePullPolicy: {{ sidecar.pull_policy or sidecar_pull_policy }}
+{% if sidecar.args %}
+        args:
+{% for arg in sidecar.args %}
+        - {{ arg }}
+{% endfor %}
+{% endif %}
+{% if sidecar.ports %}
+        ports:
+{% for port in sidecar.ports %}
+        - containerPort: {{ port.container_port }}
+{% if port.name %}
+          name: {{ port.name }}
+{% endif %}
+{% if port.protocol %}
+          protocol: {{ port.protocol }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if sidecar.set_resources %}
+        resources:
+          requests:
+            cpu: "{{ sidecar.cpu_request or '10m' }}"
+            memory: "{{ sidecar.memory_request_mb or 16 }}Mi"
+          limits:
+            memory: "{{ sidecar.memory_limit_mb or 32 }}Mi"
+{% endif %}
+{% endfor %}
+{% endif %}
 {% if target_volume_mount -%}
       {%- if target_volume_mount +%}
       volumes:
