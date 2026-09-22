@@ -8,11 +8,33 @@ spec:
     matchLabels:
       app: {{ target_app_name }}
   replicas: {{ target_replica_count }}
+{#- Rollout strategy. Opt-in: without these Kubernetes applies its own defaults #}
+{#- of 25%/25%, which take serving pods away before replacements can serve. #}
+{% if (target_max_unavailable is defined and target_max_unavailable is not none and target_max_unavailable != '') or (target_max_surge is defined and target_max_surge is not none and target_max_surge != '') %}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+{% if target_max_unavailable is defined and target_max_unavailable is not none and target_max_unavailable != '' %}
+      maxUnavailable: {{ target_max_unavailable }}
+{% endif %}
+{% if target_max_surge is defined and target_max_surge is not none and target_max_surge != '' %}
+      maxSurge: {{ target_max_surge }}
+{% endif %}
+{% endif %}
+{% if target_min_ready_seconds is defined and target_min_ready_seconds is not none and target_min_ready_seconds != '' %}
+  minReadySeconds: {{ target_min_ready_seconds }}
+{% endif %}
   template:
     metadata:
       labels:
         app: {{ target_app_name }}
     spec:
+{#- Must exceed the app's own graceful shutdown. Kubernetes defaults to 30s, and #}
+{#- SIGKILL at 30 cuts a longer drain short -- for hapi-ais-llm that is gunicorn #}
+{#- draining the billing executor with graceful_timeout 90, so queued charges die. #}
+{% if target_termination_grace_seconds is defined and target_termination_grace_seconds is not none and target_termination_grace_seconds != '' %}
+      terminationGracePeriodSeconds: {{ target_termination_grace_seconds }}
+{% endif %}
       containers:
       - image: {{ target_image_registry }}/{{ target_image_name }}:{{ target_image_tag or target_stack }}
         imagePullPolicy: Always
@@ -50,6 +72,65 @@ spec:
           mountPath: {{ itm.mount_path }} 
         {% endfor -%}
 {% endif -%}
+{#- Probes and preStop for the app container. All opt-in: a repo that sets no #}
+{#- probe path renders nothing and keeps today's behaviour. #}
+{#- Without a readinessProbe a pod joins the Service the moment the container #}
+{#- starts, before the server has bound its socket, so a rollout serves 502s. #}
+{#- Probes are deliberately shallow -- process alive, not dependencies healthy. #}
+{#- A probe that checks Mongo or Postgres fails every pod at once when that #}
+{#- dependency blips, turning degradation into an outage. #}
+{% if target_readiness_probe_path %}
+        readinessProbe:
+          httpGet:
+            path: {{ target_readiness_probe_path }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          initialDelaySeconds: {{ target_readiness_initial_delay }}
+          periodSeconds: {{ target_readiness_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_readiness_failure_threshold }}
+{% endif %}
+{% if target_liveness_probe_path %}
+        livenessProbe:
+          httpGet:
+            path: {{ target_liveness_probe_path }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          initialDelaySeconds: {{ target_liveness_initial_delay }}
+          periodSeconds: {{ target_liveness_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_liveness_failure_threshold }}
+{% endif %}
+{% if target_startup_probe_path %}
+        startupProbe:
+          httpGet:
+            path: {{ target_startup_probe_path }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          periodSeconds: {{ target_startup_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_startup_failure_threshold }}
+{% endif %}
+{#- preStop buys time for endpoint removal to propagate before SIGTERM, so #}
+{#- in-flight requests finish instead of being cut. #}
+{#- The native sleep action is used rather than an exec, because this template #}
+{#- deploys arbitrary images and a distroless or scratch image has no /bin/sh. #}
+{#- It is GA from Kubernetes 1.32. Set target_prestop_command for a custom #}
+{#- drain, or on a cluster older than that. #}
+{% if target_prestop_command %}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+{% for part in target_prestop_command %}
+              - {{ part | tojson }}
+{% endfor %}
+{% elif target_prestop_sleep_seconds is defined and target_prestop_sleep_seconds is not none and target_prestop_sleep_seconds != '' %}
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: {{ target_prestop_sleep_seconds }}
+{% endif %}
 {#- Additional sidecar containers. Opt-in: renders nothing unless target_sidecars is set, #}
 {#- so existing deployments are unaffected. Control tags are kept at column 0 so they #}
 {#- inject only harmless blank lines and never disturb content indentation. #}

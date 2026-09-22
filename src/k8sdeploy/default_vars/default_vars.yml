@@ -50,3 +50,54 @@ sidecar_pull_policy: IfNotPresent
 #   args (list), ports (list of {container_port, name, protocol}),
 #   set_resources + cpu_request/memory_request_mb/memory_limit_mb.
 target_sidecars: []
+
+# Health probes, shutdown and rollout pacing. All opt-in: every value here is
+# empty, so a deployment that sets none of them renders exactly as before.
+#
+# Without a readinessProbe a pod is added to the Service the moment its
+# container starts -- before the server has bound its socket -- so a rolling
+# update serves 502s while replacements come up. Set the path to fix that.
+#
+# Keep probes SHALLOW. They should answer "is this process serving", not "are
+# my dependencies healthy". A probe that checks a database fails every pod at
+# once when that database blips, turning degradation into an outage.
+target_readiness_probe_path: ''
+target_liveness_probe_path: ''
+target_startup_probe_path: ''
+# Defaults to target_app_port. Set scheme to HTTPS when the app terminates TLS
+# itself -- an HTTP probe against an HTTPS listener fails and the pod never
+# becomes ready.
+target_probe_port: ''
+target_probe_scheme: 'HTTP'
+target_probe_timeout: 3
+target_readiness_initial_delay: 3
+target_readiness_period: 5
+target_readiness_failure_threshold: 3
+target_liveness_initial_delay: 30
+target_liveness_period: 20
+target_liveness_failure_threshold: 3
+target_startup_period: 3
+target_startup_failure_threshold: 30
+
+# Seconds between endpoint removal and SIGTERM, so in-flight requests finish
+# rather than being cut.
+target_prestop_sleep_seconds:
+# Explicit preStop command, for a custom drain or a cluster older than 1.32
+# where the native sleep action is unavailable. Overrides the sleep above.
+# Each list item is one argv element, not a shell line: kubelet executes the
+# array directly and does NOT invoke a shell. Only wrap in /bin/sh -c if you
+# actually need shell features, and only if the image has a shell.
+target_prestop_command: []
+
+# Must exceed the app's own graceful shutdown. Kubernetes defaults to 30s and
+# SIGKILLs at that point, cutting a longer drain short.
+target_termination_grace_seconds:
+
+# Rolling update pacing. Left unset, Kubernetes uses 25%/25%, which removes
+# serving pods before replacements can serve. maxUnavailable: 0 never dips
+# below capacity. Note 0 is a meaningful value, so these are checked against
+# none rather than for truthiness.
+target_max_unavailable:
+target_max_surge:
+target_min_ready_seconds:
+
