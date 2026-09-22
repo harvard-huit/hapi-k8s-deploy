@@ -98,6 +98,59 @@ Example (in your `{stack}_k8s_vars.yml`):
         target_memory_request_mb: 512
         target_memory_limit_mb: 1024
 
+## Sidecar Containers
+deploy_type=api
+
+Extra containers alongside the application container in the same pod. **Backward
+compatible:** `target_sidecars` is an empty list by default, so a deployment that does not
+set it renders exactly as before.
+
+A sidecar shares the pod's network namespace, so the app reaches it on `localhost` at the
+container port — which is the usual reason to want one. hapi-ais-llm runs a
+statsd_exporter this way: gunicorn emits statsd over UDP to `localhost:9125` and the
+sidecar exposes a Prometheus `/metrics` endpoint on 9102 for kube-prometheus to scrape.
+
+Give the image either as a full `image` reference, or as `repo` plus `tag`, which are
+prefixed with the deploy's own `target_image_registry` — use `repo`/`tag` when the image
+is mirrored into that stack's ECR, and `image` when pulling from a public registry.
+
+Variable | Type | Description | Default Value
+-------- | ---- | ----------- | -------------
+target_sidecars | list of objects | Extra containers. Empty renders nothing. | []
+target_sidecars.name | string | Container name, unique within the pod. |
+target_sidecars.image | string | Full image reference. Takes precedence over repo/tag. |
+target_sidecars.repo | string | Image repo, prefixed with target_image_registry. Used when image is unset. |
+target_sidecars.tag | string | Image tag, used with repo. |
+target_sidecars.pull_policy | string | Image pull policy for this sidecar. | sidecar_pull_policy (IfNotPresent)
+target_sidecars.args | list of strings | Container args. Omitted entirely when unset. |
+target_sidecars.ports | list of objects | Ports to expose on the container. |
+target_sidecars.ports.container_port | int | Port number. |
+target_sidecars.ports.name | string | Optional port name. |
+target_sidecars.ports.protocol | string | Optional, e.g. `UDP`. Defaults to TCP when omitted. |
+target_sidecars.set_resources | boolean | Render a `resources` block for this sidecar. | False
+target_sidecars.cpu_request | string | CPU request when set_resources is True. | 10m
+target_sidecars.memory_request_mb | int | Memory request in MiB when set_resources is True. | 16
+target_sidecars.memory_limit_mb | int | Memory limit in MiB when set_resources is True. | 32
+
+Example (in your `common_k8s_vars.yml` or `{stack}_k8s_vars.yml`):
+
+        target_sidecars:
+          - name: statsd-exporter
+            image: quay.io/prometheus/statsd-exporter:v0.28.0
+            ports:
+              - container_port: 9102
+                name: metrics
+              - container_port: 9125
+                name: statsd-udp
+                protocol: UDP
+            set_resources: true
+            cpu_request: 10m
+
+Note that sidecar resources are separate from the app container's. `set_resources` on a
+sidecar controls only that sidecar; the app container is governed by the Resource
+Constraints section above. Probes from the Health Probes section are applied to the
+**application container only** and never to a sidecar.
+
 ## Health Probes, Shutdown and Rollout
 deploy_type=api
 
