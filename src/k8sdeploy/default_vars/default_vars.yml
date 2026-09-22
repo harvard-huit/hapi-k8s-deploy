@@ -84,7 +84,9 @@ target_startup_failure_threshold: 30
 target_prestop_sleep_seconds:
 # Explicit preStop command, for a custom drain or a cluster older than 1.32
 # where the native sleep action is unavailable. Overrides the sleep above.
-# Note an exec command requires a shell in the image.
+# Each list item is one argv element, not a shell line: kubelet executes the
+# array directly and does NOT invoke a shell. Only wrap in /bin/sh -c if you
+# actually need shell features, and only if the image has a shell.
 target_prestop_command: []
 
 # Must exceed the app's own graceful shutdown. Kubernetes defaults to 30s and

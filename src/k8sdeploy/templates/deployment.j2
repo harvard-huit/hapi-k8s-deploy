@@ -10,14 +10,14 @@ spec:
   replicas: {{ target_replica_count }}
 {#- Rollout strategy. Opt-in: without these Kubernetes applies its own defaults #}
 {#- of 25%/25%, which take serving pods away before replacements can serve. #}
-{% if (target_max_unavailable is defined and target_max_unavailable is not none) or (target_max_surge is defined and target_max_surge is not none) %}
+{% if (target_max_unavailable is defined and target_max_unavailable is not none and target_max_unavailable != '') or (target_max_surge is defined and target_max_surge is not none and target_max_surge != '') %}
   strategy:
     type: RollingUpdate
     rollingUpdate:
-{% if target_max_unavailable is defined and target_max_unavailable is not none %}
+{% if target_max_unavailable is defined and target_max_unavailable is not none and target_max_unavailable != '' %}
       maxUnavailable: {{ target_max_unavailable }}
 {% endif %}
-{% if target_max_surge is defined and target_max_surge is not none %}
+{% if target_max_surge is defined and target_max_surge is not none and target_max_surge != '' %}
       maxSurge: {{ target_max_surge }}
 {% endif %}
 {% endif %}
@@ -83,33 +83,33 @@ spec:
         readinessProbe:
           httpGet:
             path: {{ target_readiness_probe_path }}
-            port: {{ target_probe_port or target_app_port }}
-            scheme: {{ target_probe_scheme or 'HTTP' }}
-          initialDelaySeconds: {{ target_readiness_initial_delay or 3 }}
-          periodSeconds: {{ target_readiness_period or 5 }}
-          timeoutSeconds: {{ target_probe_timeout or 3 }}
-          failureThreshold: {{ target_readiness_failure_threshold or 3 }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          initialDelaySeconds: {{ target_readiness_initial_delay }}
+          periodSeconds: {{ target_readiness_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_readiness_failure_threshold }}
 {% endif %}
 {% if target_liveness_probe_path %}
         livenessProbe:
           httpGet:
             path: {{ target_liveness_probe_path }}
-            port: {{ target_probe_port or target_app_port }}
-            scheme: {{ target_probe_scheme or 'HTTP' }}
-          initialDelaySeconds: {{ target_liveness_initial_delay or 30 }}
-          periodSeconds: {{ target_liveness_period or 20 }}
-          timeoutSeconds: {{ target_probe_timeout or 3 }}
-          failureThreshold: {{ target_liveness_failure_threshold or 3 }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          initialDelaySeconds: {{ target_liveness_initial_delay }}
+          periodSeconds: {{ target_liveness_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_liveness_failure_threshold }}
 {% endif %}
 {% if target_startup_probe_path %}
         startupProbe:
           httpGet:
             path: {{ target_startup_probe_path }}
-            port: {{ target_probe_port or target_app_port }}
-            scheme: {{ target_probe_scheme or 'HTTP' }}
-          periodSeconds: {{ target_startup_period or 3 }}
-          timeoutSeconds: {{ target_probe_timeout or 3 }}
-          failureThreshold: {{ target_startup_failure_threshold or 30 }}
+            port: {{ target_probe_port if (target_probe_port is defined and target_probe_port is not none and target_probe_port != '') else target_app_port }}
+            scheme: {{ target_probe_scheme }}
+          periodSeconds: {{ target_startup_period }}
+          timeoutSeconds: {{ target_probe_timeout }}
+          failureThreshold: {{ target_startup_failure_threshold }}
 {% endif %}
 {#- preStop buys time for endpoint removal to propagate before SIGTERM, so #}
 {#- in-flight requests finish instead of being cut. #}
@@ -123,7 +123,7 @@ spec:
             exec:
               command:
 {% for part in target_prestop_command %}
-              - {{ part }}
+              - {{ part | tojson }}
 {% endfor %}
 {% elif target_prestop_sleep_seconds is defined and target_prestop_sleep_seconds is not none and target_prestop_sleep_seconds != '' %}
         lifecycle:

@@ -193,7 +193,7 @@ target_liveness_failure_threshold | int | Consecutive failures before the contai
 target_startup_period | int | Seconds between startup checks. | 3
 target_startup_failure_threshold | int | Startup checks allowed before the container is restarted. | 30
 target_prestop_sleep_seconds | int | Sleep between endpoint removal and SIGTERM so in-flight requests finish. Uses the native `sleep` action, so it needs no shell in the image. | (none)
-target_prestop_command | list of strings | Explicit preStop `exec` command, overriding the sleep above. For a custom drain, or a cluster older than 1.32. Requires a shell in the image. | []
+target_prestop_command | list of strings | Explicit preStop `exec` command, overriding the sleep above. For a custom drain, or a cluster older than 1.32. Each item is one argv element — kubelet runs the array directly and does **not** invoke a shell. | []
 target_termination_grace_seconds | int | Seconds before SIGKILL. Must exceed preStop **plus** the app's graceful shutdown. | (Kubernetes default, 30)
 target_max_unavailable | int or string | Pods that may be unavailable during a rollout. `0` never dips below capacity. | (Kubernetes default, 25%)
 target_max_surge | int or string | Extra pods allowed above the replica count during a rollout. | (Kubernetes default, 25%)
@@ -220,11 +220,18 @@ dependencies healthy". One that checks a database fails every pod at once the mo
 database blips, turning degradation into an outage. Use a path that returns a static 200
 without touching anything, and put dependency health in alerting instead.
 
+**`target_prestop_command` is argv, not a shell line.** kubelet executes the array
+directly, so `["pkill", "-TERM", "nginx"]` works and `["pkill -TERM nginx"]` does not.
+Only wrap in `/bin/sh -c` if you genuinely need shell features — and only if the image
+has a shell, which distroless and scratch do not. The default sleep needs no shell at all.
+
 **Zero is a meaningful value for several of these, and zero is falsy.** `maxUnavailable: 0`
 is the value worth setting, and `terminationGracePeriodSeconds: 0` means kill immediately.
-Every numeric variable here is therefore tested against unset/empty rather than for
-truthiness, so a deliberate `0` is not silently dropped and left looking like the
-Kubernetes default. If you add similar variables, do the same.
+`initialDelaySeconds: 0` starts checks immediately. Every numeric variable here is
+therefore tested against unset/empty rather than for truthiness, and the per-field
+defaults live only in `default_vars.yml` rather than being repeated as `or` fallbacks in
+the template — a repeated fallback turns an explicit `0` back into the default. If you
+add similar variables, do the same.
 
 ## Variables Job/CronJob 
 deploy_type=job or cronjob
