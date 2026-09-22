@@ -169,7 +169,12 @@ all returned 200.
 seconds and SIGKILLs at that point, so an application whose own shutdown runs longer is cut
 off mid-drain with nothing logged. hapi-ais-llm sets gunicorn `graceful_timeout` to 90 and
 drains its billing queue inside it — every queued charge was being dropped on each pod
-recycle. **Set this higher than whatever your app's own graceful shutdown allows.**
+recycle.
+
+**The grace period must cover the preStop hook *plus* the app's own shutdown, not just
+the shutdown.** The countdown starts when the pod is marked for deletion and preStop runs
+before SIGTERM is sent, so the two are consumed from the same budget. hapi-ais-llm uses
+10s preStop and a 90s gunicorn `graceful_timeout`, which is 100s, so it sets 120.
 
 Variable | Type | Description | Default Value
 -------- | ---- | ----------- | -------------
@@ -187,11 +192,12 @@ target_liveness_period | int | Seconds between liveness checks. | 20
 target_liveness_failure_threshold | int | Consecutive failures before the container is restarted. | 3
 target_startup_period | int | Seconds between startup checks. | 3
 target_startup_failure_threshold | int | Startup checks allowed before the container is restarted. | 30
-target_prestop_sleep_seconds | int | Sleep between endpoint removal and SIGTERM so in-flight requests finish. | '' (none)
-target_termination_grace_seconds | int | Seconds before SIGKILL. Must exceed the app's own graceful shutdown. | '' (Kubernetes default, 30)
-target_max_unavailable | int or string | Pods that may be unavailable during a rollout. `0` never dips below capacity. | '' (Kubernetes default, 25%)
-target_max_surge | int or string | Extra pods allowed above the replica count during a rollout. | '' (Kubernetes default, 25%)
-target_min_ready_seconds | int | Seconds a new pod must stay ready before it counts as available. | '' (none)
+target_prestop_sleep_seconds | int | Sleep between endpoint removal and SIGTERM so in-flight requests finish. Uses the native `sleep` action, so it needs no shell in the image. | (none)
+target_prestop_command | list of strings | Explicit preStop `exec` command, overriding the sleep above. For a custom drain, or a cluster older than 1.32. Requires a shell in the image. | []
+target_termination_grace_seconds | int | Seconds before SIGKILL. Must exceed preStop **plus** the app's graceful shutdown. | (Kubernetes default, 30)
+target_max_unavailable | int or string | Pods that may be unavailable during a rollout. `0` never dips below capacity. | (Kubernetes default, 25%)
+target_max_surge | int or string | Extra pods allowed above the replica count during a rollout. | (Kubernetes default, 25%)
+target_min_ready_seconds | int | Seconds a new pod must stay ready before it counts as available. | (none)
 
 Example (in your `common_k8s_vars.yml` or `{stack}_k8s_vars.yml`):
 
@@ -214,9 +220,11 @@ dependencies healthy". One that checks a database fails every pod at once the mo
 database blips, turning degradation into an outage. Use a path that returns a static 200
 without touching anything, and put dependency health in alerting instead.
 
-**`target_max_unavailable: 0` is the value worth setting, and `0` is falsy.** It is checked
-against `none` rather than for truthiness so it is not silently dropped. If you add similar
-variables, do the same.
+**Zero is a meaningful value for several of these, and zero is falsy.** `maxUnavailable: 0`
+is the value worth setting, and `terminationGracePeriodSeconds: 0` means kill immediately.
+Every numeric variable here is therefore tested against unset/empty rather than for
+truthiness, so a deliberate `0` is not silently dropped and left looking like the
+Kubernetes default. If you add similar variables, do the same.
 
 ## Variables Job/CronJob 
 deploy_type=job or cronjob
