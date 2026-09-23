@@ -139,10 +139,39 @@ spec:
       - name: {{ sidecar.name }}
         image: {{ sidecar.image if sidecar.image else target_image_registry + '/' + sidecar.repo + ':' + sidecar.tag }}
         imagePullPolicy: {{ sidecar.pull_policy or sidecar_pull_policy }}
+{#- command overrides the image entrypoint. args alone cannot, so a sidecar #}
+{#- that must run something other than its default -- a TLS terminator, say -- #}
+{#- needs this. Elements are quoted so one containing ": ", or reading as a #}
+{#- boolean or an integer, is still passed as the string it was written as. #}
+{% if sidecar.command %}
+        command:
+{% for part in sidecar.command %}
+        - {{ part | tojson }}
+{% endfor %}
+{% endif %}
 {% if sidecar.args %}
         args:
 {% for arg in sidecar.args %}
-        - {{ arg }}
+        - {{ arg | tojson }}
+{% endfor %}
+{% endif %}
+{#- Mount the same volumes the app container can. A sidecar terminating TLS #}
+{#- needs its certificate, and one shipping logs needs the path they are on. #}
+{% if sidecar.volume_mounts %}
+        volumeMounts:
+{% for mount in sidecar.volume_mounts %}
+        - name: {{ mount.name }}
+          mountPath: {{ mount.mount_path }}
+{% if mount.read_only %}
+          readOnly: true
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if sidecar.env %}
+        env:
+{% for entry in sidecar.env %}
+        - name: {{ entry.name }}
+          value: {{ entry.value | tojson }}
 {% endfor %}
 {% endif %}
 {% if sidecar.ports %}
@@ -172,13 +201,18 @@ spec:
       volumes:
       {%- for itm in target_volume_mount %}
       - name: {{ itm.name }}
+        {#- Kubernetes spells the configMap volume source in camelCase and keys #}
+        {#- it on `name`, not `configmapName`. Rendering `configmap:` produced #}
+        {#- "unknown field spec.template.spec.volumes[0].configmap" and was #}
+        {#- rejected, so a configmap volume has never actually worked here. #}
+        {#- Secret volumes were unaffected: `secret:`/`secretName:` is correct. #}
+        {% if itm.type.lower() == 'configmap' -%}
+        configMap:
+          name: {{ itm.configmap_name if itm.configmap_name else target_app_name + "-cm" }}
+        {%- else -%}
         {{ itm.type }}:
-          {% if itm.type.lower() == 'secret' -%}
           secretName: {{ itm.secret_name  or target_app_name + "-secret" }}
-          {% endif -%}
-          {% if itm.type.lower() == 'configmap' -%}
-          configmapName: {{  itm.configmap_name if itm.configmap_name else target_app_name + "-cm" }}
-          {% endif -%}
+        {%- endif %}
           defaultMode: {{ default_mode }}
           items:
             {% for itms in itm.data_items -%}

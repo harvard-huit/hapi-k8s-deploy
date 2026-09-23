@@ -122,7 +122,10 @@ target_sidecars.image | string | Full image reference. Takes precedence over rep
 target_sidecars.repo | string | Image repo, prefixed with target_image_registry. Used when image is unset. |
 target_sidecars.tag | string | Image tag, used with repo. |
 target_sidecars.pull_policy | string | Image pull policy for this sidecar. | sidecar_pull_policy (IfNotPresent)
+target_sidecars.command | list of strings | Overrides the image entrypoint. `args` alone cannot do this. Each item is one argv element. |
 target_sidecars.args | list of strings | Container args. Omitted entirely when unset. |
+target_sidecars.env | list of objects | Environment variables, as `{name, value}`. |
+target_sidecars.volume_mounts | list of objects | Volumes to mount, as `{name, mount_path, read_only}`. The name must match a volume the deployment already defines through `target_volume_mount`. |
 target_sidecars.ports | list of objects | Ports to expose on the container. |
 target_sidecars.ports.container_port | int | Port number. |
 target_sidecars.ports.name | string | Optional port name. |
@@ -145,6 +148,15 @@ Example (in your `common_k8s_vars.yml` or `{stack}_k8s_vars.yml`):
                 protocol: UDP
             set_resources: true
             cpu_request: 10m
+
+`command` exists because some sidecars must run something other than their image's
+default entrypoint — a TLS-terminating proxy, for example, which needs its own config
+written or a certificate generated before the server starts. Setting `args` alone does
+not replace the entrypoint, only its arguments.
+
+`volume_mounts` can only reference a volume the deployment already defines through
+`target_volume_mount`; it does not create one. A sidecar terminating TLS needs its
+certificate this way, and one shipping logs needs the path they are written to.
 
 Note that sidecar resources are separate from the app container's. `set_resources` on a
 sidecar controls only that sidecar; the app container is governed by the Resource
