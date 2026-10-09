@@ -212,6 +212,24 @@ class KubernetesDeploy():
             attempts += 1
         return  cluster['cluster']['resourcesVpcConfig']
     
+    def wait_api_reachable(self,attempts=18,delay_seconds=10):
+        """
+            An ACTIVE cluster is not necessarily reachable from this runner: a
+            just-added publicAccessCidrs entry can lag. Retry before the first
+            apply so that lag fails here, clearly, rather than as a confusing
+            openapi download timeout on the namespace manifest.
+        """
+        command=['kubectl','get','--raw=/readyz','--request-timeout=10s']
+        for attempt in range(1,attempts+1):
+            result=run(command, capture_output=True, encoding='UTF-8')
+            if result.returncode == 0:
+                return
+            print(f"Kubernetes API not reachable yet (attempt {attempt}/{attempts}): {result.stderr.strip()}")
+            if attempt < attempts:
+                sleep(delay_seconds)
+        print(f"ERROR: Kubernetes API for {self.cluster_name} unreachable; check this runner's IP is in the cluster's publicAccessCidrs", file=sys.stderr)
+        raise CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
+
     def load_deploy(self,template,action):
         """
             Render a template and hand it to kubectl. A non-zero kubectl exit
@@ -267,6 +285,7 @@ class KubernetesDeploy():
         # First double check API is Ready after adding 
         # GH Runner Ip4 to cluster config 
         self.wait_api_availability()
+        self.wait_api_reachable()
         # Check AWS Token
         self.checkAWSToken(self.vars['ecr_account_id'])
         # Namespace
@@ -326,6 +345,23 @@ class EksUpateConfig():
             attempts += 1
         return  cluster['cluster']['resourcesVpcConfig']
     
+    def wait_for_cidr(self,cidr: str):
+        """
+            update_cluster_config returns as soon as EKS accepts the change, but
+            describe_cluster keeps reporting the old publicAccessCidrs until it
+            is applied, and only then can this runner reach the API. Polls
+            describe_cluster rather than describe_update because the GitHub
+            deploy roles are not granted eks:DescribeUpdate.
+        """
+        attempts=0
+        while cidr not in self.eks.describe_cluster(name=self.cluster_name)['cluster']['resourcesVpcConfig']['publicAccessCidrs']:
+            if attempts >60:
+                with self.disable_exception_traceback():
+                    raise Exception(f"{cidr} still not in {self.cluster_name} publicAccessCidrs after 10 minutes")
+            sleep(10)
+            attempts += 1
+        print(f"{cidr} is now in {self.cluster_name} publicAccessCidrs")
+
     def update_config(self,action: str):
         wait=True
         attempts=0
@@ -339,6 +375,10 @@ class EksUpateConfig():
                     resources_vpc_config['publicAccessCidrs'].remove(f"{self.ip4}/32")
             try:
                 self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
+                if action.lower() != 'delete':
+                    # The runner cannot reach the API until the update lands, and a
+                    # cleanup that runs before then finds no IP to remove and leaks it
+                    self.wait_for_cidr(f"{self.ip4}/32")
                 wait=False
             except self.eks.exceptions.InvalidParameterException as e:
                 # parameters should be correct unless Cluster is already at the desired configuration

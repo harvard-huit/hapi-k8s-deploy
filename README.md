@@ -65,6 +65,13 @@ keeps bringing pods up is not failed, so a red step means stuck, not slow.
 waits forever. A failed step does not roll anything back: the Deployment stays as
 applied, so check it with `kubectl rollout status` / `kubectl get pods` before
 re-running.
+
+Before the first apply, `k8sdeploy` waits (up to ~3 minutes) for the Kubernetes API to be
+reachable from where it runs. The `--update-eks-config` add, run by
+`hapi-action-eksdeploy` before the deploy, likewise waits for EKS to finish applying the
+runner's IP to `publicAccessCidrs`. EKS applies that change asynchronously. Without the
+wait the first `kubectl` call timed out (`failed to download openapi`), and a cleanup that
+ran before the add landed found no IP to remove, leaving it allowlisted.
         
 
 
