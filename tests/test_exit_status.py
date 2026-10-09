@@ -181,7 +181,11 @@ def test_unreachable_api_fails_before_any_apply(fake_kubectl, monkeypatch):
 
 
 class FakeEks:
-    """Just enough of the boto3 EKS client for EksUpateConfig."""
+    """
+    Just enough of the boto3 EKS client for EksUpateConfig. Like EKS, an
+    accepted CIDR update only shows in describe_cluster `polls_until_applied`
+    calls later.
+    """
 
     class exceptions:
         class InvalidParameterException(Exception):
@@ -190,51 +194,58 @@ class FakeEks:
         class ResourceInUseException(Exception):
             pass
 
-    def __init__(self, update_statuses):
+    def __init__(self, polls_until_applied=0):
         self.cidrs = ["128.103.150.243/32"]
-        self.update_statuses = list(update_statuses)
+        self.pending_cidrs = None
+        self.polls_until_applied = polls_until_applied
+        self.describe_calls = 0
         self.update_requests = []
 
     def describe_cluster(self, name):
+        self.describe_calls += 1
+        if self.pending_cidrs is not None:
+            if self.polls_until_applied == 0:
+                self.cidrs, self.pending_cidrs = self.pending_cidrs, None
+            else:
+                self.polls_until_applied -= 1
         return {"cluster": {"status": "ACTIVE",
                             "resourcesVpcConfig": {"publicAccessCidrs": list(self.cidrs)}}}
 
     def update_cluster_config(self, name, resourcesVpcConfig):
         self.update_requests.append(resourcesVpcConfig["publicAccessCidrs"])
+        self.pending_cidrs = list(resourcesVpcConfig["publicAccessCidrs"])
         return {"update": {"id": "update-1"}}
 
-    def describe_update(self, name, updateId):
-        return {"update": {"status": self.update_statuses.pop(0), "errors": []}}
 
-
-def make_eks_update(monkeypatch, update_statuses):
+def make_eks_update(monkeypatch, polls_until_applied=0):
     monkeypatch.setattr("k8sdeploy.k8sdeploy.sleep", lambda seconds: None)
     eks_update = EksUpateConfig.__new__(EksUpateConfig)
     eks_update.stack = "dev"
     eks_update.cluster_name = "adexk8s-eks-cluster-dev"
     eks_update.ip4 = "20.168.125.97"
-    eks_update.eks = FakeEks(update_statuses)
+    eks_update.eks = FakeEks(polls_until_applied)
     return eks_update
 
 
 def test_adding_runner_ip_waits_until_the_update_is_applied(monkeypatch):
-    eks_update = make_eks_update(monkeypatch, ["InProgress", "InProgress", "Successful"])
+    eks_update = make_eks_update(monkeypatch, polls_until_applied=3)
     eks_update.update_config("apply")
-    assert eks_update.eks.update_statuses == []
-    assert "20.168.125.97/32" in eks_update.eks.update_requests[0]
+    assert "20.168.125.97/32" in eks_update.eks.cidrs
+    assert eks_update.eks.pending_cidrs is None
 
 
-def test_failed_allowlist_update_raises(monkeypatch):
-    eks_update = make_eks_update(monkeypatch, ["InProgress", "Failed"])
-    with pytest.raises(Exception, match="Failed"):
+def test_allowlist_update_that_never_applies_raises(monkeypatch):
+    eks_update = make_eks_update(monkeypatch, polls_until_applied=1000)
+    with pytest.raises(Exception, match="still not in"):
         eks_update.update_config("apply")
 
 
 def test_removing_runner_ip_does_not_wait(monkeypatch):
-    eks_update = make_eks_update(monkeypatch, [])
+    eks_update = make_eks_update(monkeypatch, polls_until_applied=1000)
     eks_update.eks.cidrs.append("20.168.125.97/32")
     eks_update.update_config("delete")
     assert eks_update.eks.update_requests == [["128.103.150.243/32"]]
+    assert eks_update.eks.describe_calls == 1
 
 
 def test_main_exits_non_zero_when_kubectl_fails(monkeypatch):

@@ -345,25 +345,22 @@ class EksUpateConfig():
             attempts += 1
         return  cluster['cluster']['resourcesVpcConfig']
     
-    def wait_for_update(self,update_id: str):
+    def wait_for_cidr(self,cidr: str):
         """
-            update_cluster_config returns as soon as EKS accepts the change; the
-            new publicAccessCidrs only apply once the update reaches Successful.
+            update_cluster_config returns as soon as EKS accepts the change, but
+            describe_cluster keeps reporting the old publicAccessCidrs until it
+            is applied, and only then can this runner reach the API. Polls
+            describe_cluster rather than describe_update because the GitHub
+            deploy roles are not granted eks:DescribeUpdate.
         """
         attempts=0
-        while True:
-            update=self.eks.describe_update(name=self.cluster_name,updateId=update_id)['update']
-            if update['status'] == 'Successful':
-                print(f"EKS endpoint access update {update_id} applied")
-                return
-            if update['status'] in ('Failed','Cancelled'):
-                with self.disable_exception_traceback():
-                    raise Exception(f"EKS endpoint access update {update_id} {update['status']}: {update.get('errors')}")
+        while cidr not in self.eks.describe_cluster(name=self.cluster_name)['cluster']['resourcesVpcConfig']['publicAccessCidrs']:
             if attempts >60:
                 with self.disable_exception_traceback():
-                    raise Exception(f"EKS endpoint access update {update_id} still {update['status']} after 10 minutes on {self.cluster_name}")
+                    raise Exception(f"{cidr} still not in {self.cluster_name} publicAccessCidrs after 10 minutes")
             sleep(10)
             attempts += 1
+        print(f"{cidr} is now in {self.cluster_name} publicAccessCidrs")
 
     def update_config(self,action: str):
         wait=True
@@ -377,11 +374,11 @@ class EksUpateConfig():
                 if f"{self.ip4}/32" in resources_vpc_config['publicAccessCidrs']:
                     resources_vpc_config['publicAccessCidrs'].remove(f"{self.ip4}/32")
             try:
-                response=self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
+                self.eks.update_cluster_config(name=self.cluster_name,resourcesVpcConfig={"publicAccessCidrs":resources_vpc_config['publicAccessCidrs']})
                 if action.lower() != 'delete':
                     # The runner cannot reach the API until the update lands, and a
                     # cleanup that runs before then finds no IP to remove and leaks it
-                    self.wait_for_update(response['update']['id'])
+                    self.wait_for_cidr(f"{self.ip4}/32")
                 wait=False
             except self.eks.exceptions.InvalidParameterException as e:
                 # parameters should be correct unless Cluster is already at the desired configuration
