@@ -105,3 +105,15 @@ target_max_unavailable:
 target_max_surge:
 target_min_ready_seconds:
 
+# After applying a Deployment, wait for its pods to become ready and fail the
+# deploy if they do not. kubectl apply only proves the manifest was accepted --
+# a bad image or a pod that never passes readiness is otherwise reported as
+# success.
+#
+# This is a BACKSTOP, not the failure detector. A stuck rollout fails on the
+# Deployment's own progressDeadlineSeconds (Kubernetes default 600), which only
+# counts time WITHOUT progress, so a slow rollout that keeps bringing pods up is
+# not failed. This wall-clock limit only stops a runner waiting forever.
+# 0 skips the wait.
+target_rollout_timeout_seconds: 1800
+

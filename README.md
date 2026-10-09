@@ -47,6 +47,24 @@ Must be logged into the appropriate AWS account for secrets  `stack/secretname` 
                                 directory}/k8s_vars/{stack}_k8s_vars.yml
         -e ECR_ACCOUNT_ID, --ecr-account-id ECR_ACCOUNT_ID
                                 ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'
+
+### Exit status
+
+`k8sdeploy` exits non-zero when any `kubectl` call fails, which is what fails the
+`hapi-action-eksdeploy` step. For `deploy_type: api` it also waits for the Deployment to
+roll out (`kubectl rollout status`, see `target_rollout_timeout_seconds`), because
+`kubectl apply` succeeds for a manifest the API server accepts even when its image cannot
+be pulled or its pods never become ready. `-a delete` passes `--ignore-not-found`, so
+deleting something already gone still succeeds.
+
+The rollout wait fails on **lack of progress**, not elapsed time. Kubernetes marks a
+Deployment failed once `progressDeadlineSeconds` (default 600) pass with no new pod
+becoming ready, and `kubectl rollout status` exits non-zero on that. A slow rollout that
+keeps bringing pods up is not failed, so a red step means stuck, not slow.
+`target_rollout_timeout_seconds` (default 1800) is only a backstop so a runner never
+waits forever. A failed step does not roll anything back: the Deployment stays as
+applied, so check it with `kubectl rollout status` / `kubectl get pods` before
+re-running.
         
 
 
@@ -210,6 +228,7 @@ target_termination_grace_seconds | int | Seconds before SIGKILL. Must exceed pre
 target_max_unavailable | int or string | Pods that may be unavailable during a rollout. `0` never dips below capacity. | (Kubernetes default, 25%)
 target_max_surge | int or string | Extra pods allowed above the replica count during a rollout. | (Kubernetes default, 25%)
 target_min_ready_seconds | int | Seconds a new pod must stay ready before it counts as available. | (none)
+target_rollout_timeout_seconds | int | Backstop: the longest the deploy will wait for the rollout to finish. A stuck rollout fails sooner, on the Deployment's progress deadline (see Exit status). `0` skips the wait. | 1800
 
 Example (in your `common_k8s_vars.yml` or `{stack}_k8s_vars.yml`):
 
