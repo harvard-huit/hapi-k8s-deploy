@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import argparse
+from subprocess import CalledProcessError
 from k8sdeploy.k8sdeploy import KubernetesDeploy, EksUpateConfig
 
 class UserNamespace(object):
@@ -32,9 +34,18 @@ def main():
                         default="",
                         help="""Update EKS CIDRs: Github runner IP4 address to either add or remove """)
     args=parser1.parse_args()
-    if args.update_eks_config:
-        eks_update=EksUpateConfig(args.stack,args.update_eks_config)
-        eks_update.update_config(args.action)
-    else:
-        deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)
-        deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
+    try:
+        if args.update_eks_config:
+            eks_update=EksUpateConfig(args.stack,args.update_eks_config)
+            eks_update.update_config(args.action)
+        else:
+            deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)
+            deploy.deploy_objects(action=args.action,delete_namespace=args.delete_namespace)
+    except CalledProcessError as error:
+        # kubectl has already printed why; a non-zero exit is what fails the CI step
+        print(f"k8sdeploy: '{' '.join(error.cmd)}' exited {error.returncode}", file=sys.stderr)
+        return error.returncode or 1
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

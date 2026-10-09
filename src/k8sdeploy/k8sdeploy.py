@@ -8,7 +8,7 @@ import base64
 import sys
 from contextlib import contextmanager
 from botocore.exceptions import ClientError, NoCredentialsError
-from subprocess import run, check_output
+from subprocess import run, check_output, CalledProcessError
 from six import b
 from time import sleep
 
@@ -64,23 +64,28 @@ class KubernetesDeploy():
     def set_ingress_tag_data(self,var_data):
         if var_data['ingress_additional_tags']:
             # Default tags
-            default_tags=var_data['ingress_tags'].split(",")
-            try:
-                default_tags=dict(t.split("=") for t in map(str.strip, default_tags))
-            except:
-                default_tags=dict(t.split(":") for t in map(str.strip, default_tags))
+            default_tags=self.parse_tags(var_data['ingress_tags'],'ingress_tags')
             # Additional tags
-            additonal_tags=var_data['ingress_additional_tags'].split(",")
-            try:
-                additonal_tags=dict(t.split("=") for t in map(str.strip, additonal_tags))
-            except:
-                additonal_tags=dict(t.split(":") for t in map(str.strip, additonal_tags))            
+            additonal_tags=self.parse_tags(var_data['ingress_additional_tags'],'ingress_additional_tags')
             # Merge tags
             tags=default_tags | additonal_tags
             tags_string=",".join([f"{key}={value}" for key, value in tags.items()])
             var_data['ingress_tags']=tags_string
         return var_data
     
+    def parse_tags(self,tags_string,variable_name):
+        """
+            Parse "key=value,key=value" into a dict, falling back to ":" as the
+            separator when "=" does not fit every tag.
+        """
+        tags=[tag.strip() for tag in tags_string.split(",")]
+        for separator in ("=",":"):
+            try:
+                return dict(tag.split(separator) for tag in tags)
+            except ValueError:
+                continue
+        raise ValueError(f"{variable_name} must be comma-separated key=value (or key:value) pairs, got: {tags_string!r}")
+
     def get_tag_data(self, var_data):
         lookup={"dev":"Development","prod":"Production","stage":"Stage","sand":"Development"}
         var_data['stack']=self.stack
@@ -207,32 +212,57 @@ class KubernetesDeploy():
             attempts += 1
         return  cluster['cluster']['resourcesVpcConfig']
     
-    def load_deploy(self,template,action):     
+    def load_deploy(self,template,action):
+        """
+            Render a template and hand it to kubectl. A non-zero kubectl exit
+            raises CalledProcessError so the deploy fails instead of going green.
+        """
+        rendered=self.load_template(template,self.vars)
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.yaml', delete=False) as temp_file:
+            temp_file.write(rendered)
+        command=['kubectl', action ,'-f',temp_file.name ]
+        if action == "delete":
+            # Already gone is the goal of a delete, not a failure
+            command.append('--ignore-not-found')
         try:
-            rendered=self.load_template(template,self.vars)
-            with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
-                temp_file.write(rendered)
             if template == "deployment":
-                result=check_output(['kubectl', action ,'-f',temp_file.name ], encoding='UTF-8')
+                result=check_output(command, encoding='UTF-8')
                 if "unchanged" in result:
                     self.rollout_restart=True
                 else:
                     print(result)
             else:
-                run(['kubectl', action ,'-f',temp_file.name ])
-        except Exception as e:
-            print (e)
+                run(command, check=True)
+        except CalledProcessError as error:
+            if error.output:
+                print(error.output)
+            print(f"ERROR: kubectl {action} of the {template} manifest failed (exit {error.returncode})", file=sys.stderr)
+            raise
         finally:
-            # Ensure tempfile is closed and removed
-            temp_file.close()
+            # Rendered secrets must not outlive the run
             os.unlink(temp_file.name)
 
     def deployment_rollout_restart(self):
-        self.vars['target_app_name']
         run(['kubectl', "rollout", "restart" ,
              f"deployment.apps/{self.vars['target_app_name']}",
-             "-n", f"{self.vars['target_namespace']}"])
-        
+             "-n", f"{self.vars['target_namespace']}"], check=True)
+
+    def wait_for_rollout(self):
+        """
+            Block until the Deployment's new pods are ready. kubectl apply only
+            proves the API server accepted the manifest; an image that cannot be
+            pulled, or a pod that never passes readiness, only shows up here.
+            A stuck rollout fails on the Deployment's progressDeadlineSeconds;
+            the timeout is only a backstop against waiting forever.
+        """
+        timeout=self.vars.get('target_rollout_timeout_seconds')
+        if timeout is None or timeout == '' or int(timeout) == 0:
+            return
+        run(['kubectl', "rollout", "status",
+             f"deployment.apps/{self.vars['target_app_name']}",
+             "-n", f"{self.vars['target_namespace']}",
+             f"--timeout={int(timeout)}s"], check=True)
+
     def deploy_objects(self,action="apply",delete_namespace=False):
         # First double check API is Ready after adding 
         # GH Runner Ip4 to cluster config 
@@ -256,6 +286,8 @@ class KubernetesDeploy():
                 self.load_deploy("ingress",action)
             if self.rollout_restart:
                 self.deployment_rollout_restart()
+            if action != "delete":
+                self.wait_for_rollout()
         elif self.vars['deploy_type'].lower() in ['job','cronjob']:
             self.load_deploy("job",action)
         # namespace delete
