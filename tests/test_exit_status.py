@@ -13,7 +13,7 @@ from subprocess import CalledProcessError
 import pytest
 
 from k8sdeploy import main as main_module
-from k8sdeploy.k8sdeploy import KubernetesDeploy
+from k8sdeploy.k8sdeploy import KubernetesDeploy, EksUpateConfig
 
 
 API_VARS = {
@@ -37,11 +37,21 @@ def fake_kubectl(tmp_path, monkeypatch):
     """
     call_log = tmp_path / "calls.log"
 
-    def install(fail_on=None, apply_output="deployment.apps/demo-app configured"):
+    def install(fail_on=None, apply_output="deployment.apps/demo-app configured", unreachable_for=0):
         script = tmp_path / "kubectl"
         failure_check = ""
+        if unreachable_for:
+            # The first N /readyz probes fail, as when a new allowlist entry lags
+            counter = tmp_path / "readyz.count"
+            failure_check += (
+                'case "$*" in *readyz*) '
+                f'count=$(cat "{counter}" 2>/dev/null || echo 0); '
+                f'echo $((count + 1)) > "{counter}"; '
+                f'if [ "$count" -lt {unreachable_for} ]; then '
+                'echo "dial tcp: i/o timeout" >&2; exit 1; fi;; esac\n'
+            )
         if fail_on:
-            failure_check = (
+            failure_check += (
                 f'case "$*" in *"{fail_on}"*) '
                 'echo "error: simulated kubectl failure" >&2; exit 1;; esac\n'
             )
@@ -62,6 +72,7 @@ def make_deploy(monkeypatch, **overrides):
     """A KubernetesDeploy with AWS and template rendering stubbed out."""
     deploy = KubernetesDeploy.__new__(KubernetesDeploy)
     deploy.stack = "dev"
+    deploy.cluster_name = "adexk8s-eks-cluster-dev"
     deploy.vars = API_VARS | overrides
     deploy.rollout_restart = False
     monkeypatch.setattr(deploy, "wait_api_availability", lambda: None)
@@ -102,8 +113,9 @@ def test_failed_apply_stops_the_deploy(fake_kubectl, monkeypatch):
     deploy = make_deploy(monkeypatch)
     with pytest.raises(CalledProcessError):
         deploy.deploy_objects()
-    # namespace was the first apply and it failed, so nothing after it ran
-    assert len(logged_calls(call_log)) == 1
+    calls = logged_calls(call_log)
+    # the reachability probe, then the namespace apply that failed; nothing after it
+    assert len(calls) == 2 and "readyz" in calls[0] and "apply" in calls[1]
 
 
 def test_rollout_that_never_becomes_ready_fails(fake_kubectl, monkeypatch):
@@ -136,7 +148,7 @@ def test_delete_tolerates_resources_already_gone(fake_kubectl, monkeypatch):
     call_log = fake_kubectl()
     deploy = make_deploy(monkeypatch)
     deploy.deploy_objects(action="delete")
-    calls = logged_calls(call_log)
+    calls = [call for call in logged_calls(call_log) if "readyz" not in call]
     assert calls and all("--ignore-not-found" in call for call in calls)
     assert not any("rollout status" in call for call in calls)
 
@@ -146,6 +158,83 @@ def test_successful_deploy_waits_for_rollout(fake_kubectl, monkeypatch):
     deploy = make_deploy(monkeypatch)
     deploy.deploy_objects()
     assert "rollout status" in logged_calls(call_log)[-1]
+
+
+def test_deploy_waits_for_the_api_to_become_reachable(fake_kubectl, monkeypatch):
+    """The failure the first post-fix run hit: the allowlist entry lagged."""
+    monkeypatch.setattr("k8sdeploy.k8sdeploy.sleep", lambda seconds: None)
+    call_log = fake_kubectl(unreachable_for=3)
+    deploy = make_deploy(monkeypatch)
+    deploy.deploy_objects()
+    calls = logged_calls(call_log)
+    assert sum("readyz" in call for call in calls) == 4
+    assert "rollout status" in calls[-1]
+
+
+def test_unreachable_api_fails_before_any_apply(fake_kubectl, monkeypatch):
+    monkeypatch.setattr("k8sdeploy.k8sdeploy.sleep", lambda seconds: None)
+    call_log = fake_kubectl(unreachable_for=100)
+    deploy = make_deploy(monkeypatch)
+    with pytest.raises(CalledProcessError):
+        deploy.deploy_objects()
+    assert not any("apply" in call for call in logged_calls(call_log))
+
+
+class FakeEks:
+    """Just enough of the boto3 EKS client for EksUpateConfig."""
+
+    class exceptions:
+        class InvalidParameterException(Exception):
+            pass
+
+        class ResourceInUseException(Exception):
+            pass
+
+    def __init__(self, update_statuses):
+        self.cidrs = ["128.103.150.243/32"]
+        self.update_statuses = list(update_statuses)
+        self.update_requests = []
+
+    def describe_cluster(self, name):
+        return {"cluster": {"status": "ACTIVE",
+                            "resourcesVpcConfig": {"publicAccessCidrs": list(self.cidrs)}}}
+
+    def update_cluster_config(self, name, resourcesVpcConfig):
+        self.update_requests.append(resourcesVpcConfig["publicAccessCidrs"])
+        return {"update": {"id": "update-1"}}
+
+    def describe_update(self, name, updateId):
+        return {"update": {"status": self.update_statuses.pop(0), "errors": []}}
+
+
+def make_eks_update(monkeypatch, update_statuses):
+    monkeypatch.setattr("k8sdeploy.k8sdeploy.sleep", lambda seconds: None)
+    eks_update = EksUpateConfig.__new__(EksUpateConfig)
+    eks_update.stack = "dev"
+    eks_update.cluster_name = "adexk8s-eks-cluster-dev"
+    eks_update.ip4 = "20.168.125.97"
+    eks_update.eks = FakeEks(update_statuses)
+    return eks_update
+
+
+def test_adding_runner_ip_waits_until_the_update_is_applied(monkeypatch):
+    eks_update = make_eks_update(monkeypatch, ["InProgress", "InProgress", "Successful"])
+    eks_update.update_config("apply")
+    assert eks_update.eks.update_statuses == []
+    assert "20.168.125.97/32" in eks_update.eks.update_requests[0]
+
+
+def test_failed_allowlist_update_raises(monkeypatch):
+    eks_update = make_eks_update(monkeypatch, ["InProgress", "Failed"])
+    with pytest.raises(Exception, match="Failed"):
+        eks_update.update_config("apply")
+
+
+def test_removing_runner_ip_does_not_wait(monkeypatch):
+    eks_update = make_eks_update(monkeypatch, [])
+    eks_update.eks.cidrs.append("20.168.125.97/32")
+    eks_update.update_config("delete")
+    assert eks_update.eks.update_requests == [["128.103.150.243/32"]]
 
 
 def test_main_exits_non_zero_when_kubectl_fails(monkeypatch):
