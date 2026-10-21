@@ -4,7 +4,7 @@ import os
 import sys
 import argparse
 from subprocess import CalledProcessError
-from k8sdeploy.k8sdeploy import KubernetesDeploy, EksUpateConfig
+from k8sdeploy.k8sdeploy import KubernetesDeploy, EksUpateConfig, resolve_cluster_name, read_cluster_vars
 
 class UserNamespace(object):
     """ Arg Parser class """
@@ -14,7 +14,7 @@ def main():
     user_namespace = UserNamespace()
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-s","--stack", type=str,default="dev",
-                        help="stack(prod,stage,dev or sand) default='dev'")
+                        help="stack(prod,stage,test,dev or sand) default='dev'")
     
     parser.add_argument("-a","--action", type=str,default="apply",
                         help="Action verb: create, delete, apply (default='apply')")
@@ -33,10 +33,19 @@ def main():
     parser1.add_argument("-u","--update-eks-config", type=str, 
                         default="",
                         help="""Update EKS CIDRs: Github runner IP4 address to either add or remove """)
+    parser1.add_argument("-c","--print-cluster-name", action='store_true',
+                        help="""Print the EKS cluster name the stack and k8s vars resolve to, then exit """)
     args=parser1.parse_args()
+    if args.print_cluster_name:
+        try:
+            print(resolve_cluster_name(args.stack,read_cluster_vars(args.filename)))
+        except ValueError as error:
+            print(f"k8sdeploy: {error}", file=sys.stderr)
+            return 1
+        return 0
     try:
         if args.update_eks_config:
-            eks_update=EksUpateConfig(args.stack,args.update_eks_config)
+            eks_update=EksUpateConfig(args.stack,args.update_eks_config,args.filename)
             eks_update.update_config(args.action)
         else:
             deploy=KubernetesDeploy(args.filename,args.stack,args.ecr_account)

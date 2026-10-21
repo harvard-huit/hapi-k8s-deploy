@@ -75,6 +75,7 @@ def make_deploy(monkeypatch, **overrides):
     deploy.cluster_name = "adexk8s-eks-cluster-dev"
     deploy.vars = API_VARS | overrides
     deploy.rollout_restart = False
+    monkeypatch.setattr(deploy, "check_kubeconfig_cluster", lambda: None)
     monkeypatch.setattr(deploy, "wait_api_availability", lambda: None)
     monkeypatch.setattr(deploy, "checkAWSToken", lambda account: None)
     monkeypatch.setattr(deploy, "load_template", lambda name, data: f"kind: {name}\n")
