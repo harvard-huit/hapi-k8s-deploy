@@ -36,6 +36,7 @@ class KubernetesDeploy():
         data=self.get_tag_data(data)
         data = self.load_defaults('default_vars.yml',data) | data
         data = self.set_ingress_tag_data(data)
+        data = self.set_hpa_data(data)
         d=data.pop("target_app_secrets_ref",None)
         d=data.pop("target_app_env",None)
         d=data.pop("ingress_additional_tags",None)
@@ -73,6 +74,32 @@ class KubernetesDeploy():
             var_data['ingress_tags']=tags_string
         return var_data
     
+    def set_hpa_data(self,var_data):
+        """
+            Resolve and check the HPA settings when target_hpa_enabled, so a bad
+            config fails before anything is applied rather than as an HPA that
+            shows <unknown> targets and never scales.
+        """
+        if not var_data.get('target_hpa_enabled'):
+            return var_data
+        def is_set(value):
+            return value is not None and value != ''
+        if not is_set(var_data.get('target_hpa_min_replicas')):
+            var_data['target_hpa_min_replicas']=var_data['target_replica_count']
+        if not is_set(var_data.get('target_hpa_max_replicas')):
+            raise ValueError("target_hpa_max_replicas is required when target_hpa_enabled is True")
+        min_replicas=int(var_data['target_hpa_min_replicas'])
+        max_replicas=int(var_data['target_hpa_max_replicas'])
+        if min_replicas < 1 or max_replicas < min_replicas:
+            raise ValueError(f"HPA needs 1 <= target_hpa_min_replicas ({min_replicas}) <= target_hpa_max_replicas ({max_replicas})")
+        utilization=[name for name in ('target_hpa_cpu_utilization','target_hpa_memory_utilization') if is_set(var_data.get(name))]
+        if not utilization and not var_data.get('target_hpa_metrics'):
+            raise ValueError("HPA has no metric: set target_hpa_cpu_utilization, target_hpa_memory_utilization or target_hpa_metrics")
+        if utilization and not var_data.get('target_set_resources'):
+            # Utilization is a percentage of the request; with none the HPA can't compute it
+            raise ValueError(f"{', '.join(utilization)} needs container requests: set target_set_resources True")
+        return var_data
+
     def parse_tags(self,tags_string,variable_name):
         """
             Parse "key=value,key=value" into a dict, falling back to ":" as the
@@ -260,6 +287,28 @@ class KubernetesDeploy():
             # Rendered secrets must not outlive the run
             os.unlink(temp_file.name)
 
+    def current_replica_count(self):
+        """
+            The Deployment's live replica count, or None when it doesn't exist
+            yet. With an HPA this is rendered back unchanged, so a deploy never
+            undoes a scale-up.
+        """
+        output=check_output(['kubectl', "get", "deployment", self.vars['target_app_name'],
+                             "-n", f"{self.vars['target_namespace']}",
+                             "-o", "jsonpath={.spec.replicas}", "--ignore-not-found"], encoding='UTF-8').strip()
+        return int(output) if output.isdigit() else None
+
+    def remove_hpa(self):
+        """
+            Delete the HPA k8sdeploy created for this app, found by label, so an
+            app that turns autoscaling off stops being scaled. A hand-applied
+            HPA lacks the label and is left alone.
+        """
+        run(['kubectl', "delete", "hpa",
+             "-n", f"{self.vars['target_namespace']}",
+             "-l", f"app={self.vars['target_app_name']},app.kubernetes.io/managed-by=k8sdeploy",
+             "--ignore-not-found"], check=True)
+
     def deployment_rollout_restart(self):
         run(['kubectl', "rollout", "restart" ,
              f"deployment.apps/{self.vars['target_app_name']}",
@@ -298,7 +347,14 @@ class KubernetesDeploy():
             self.load_deploy("configmap",action)
         # Deploy k8s objects
         if self.vars['deploy_type'].lower() == 'api':
+            hpa_enabled=self.vars.get('target_hpa_enabled') and action != "delete"
+            if hpa_enabled:
+                self.vars['target_live_replica_count']=self.current_replica_count()
             self.load_deploy("deployment",action)
+            if hpa_enabled:
+                self.load_deploy("hpa",action)
+            else:
+                self.remove_hpa()
             if self.vars['create_service']:
                 self.load_deploy("service",action)
             if self.vars['create_ingress']:

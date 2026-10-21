@@ -271,6 +271,80 @@ defaults live only in `default_vars.yml` rather than being repeated as `or` fall
 the template — a repeated fallback turns an explicit `0` back into the default. If you
 add similar variables, do the same.
 
+## Horizontal Pod Autoscaler
+deploy_type=api
+
+Opt-in HorizontalPodAutoscaler for the app's Deployment, switched on in the app's own
+`k8s_vars` files. **Backward compatible:** `target_hpa_enabled` is `False` by default, so a
+deployment that does not set it renders exactly as before and gets no HPA.
+
+**While it is on, the HPA owns the replica count.** Without an HPA every deploy renders
+`replicas: target_replica_count`, which would reset a scaled-up Deployment mid-load. With
+one, the deploy reads the Deployment's live count and renders that back unchanged (or
+`target_hpa_min_replicas` if the Deployment doesn't exist yet), so `target_replica_count`
+no longer matters.
+
+**Turning it off removes the HPA.** A deploy with `target_hpa_enabled: False` deletes the
+HPA k8sdeploy created for that app, found by its `app.kubernetes.io/managed-by: k8sdeploy`
+label, and the Deployment goes back to `target_replica_count`. A hand-applied HPA has no
+such label and is never deleted. Enabling the HPA on an app that already has a hand-applied
+HPA of the same name takes it over.
+
+CPU and memory targets are a percentage of the **app container's** request
+(`ContainerResource`), so sidecar requests don't dilute them, and they need
+`target_set_resources: True`. Metrics come from metrics-server, which every cluster runs.
+Anything in `target_hpa_metrics` beyond CPU and memory needs a metrics adapter on the
+cluster (prometheus-adapter serves `gunicorn_requests_per_second` on dev, stage and prod).
+When the new pods don't fit, cluster-autoscaler adds nodes, up to each nodegroup's max.
+
+The settings are checked before anything is applied. A missing max, min above max, a
+utilization target without requests, or an HPA with no metric fails the deploy up front.
+
+Variable | Type | Description | Default Value
+-------- | ---- | ----------- | -------------
+target_hpa_enabled | boolean | Master switch. | False
+target_hpa_min_replicas | int | Fewest pods the HPA keeps. | target_replica_count
+target_hpa_max_replicas | int | Required when enabled. Most pods the HPA scales to. |
+target_hpa_cpu_utilization | int | Target CPU, % of the app container's request. `''` disables it. | 70
+target_hpa_memory_utilization | int | Target memory, % of the app container's request. | '' (none)
+target_hpa_metrics | list of objects | Extra `autoscaling/v2` metrics (`Pods`, `Object`, `External`), written as in an HPA. | []
+target_hpa_behavior | object | `autoscaling/v2` `behavior` (scale-up/down pacing). Empty uses the Kubernetes defaults. | {}
+
+Example: CPU only (in your `common_k8s_vars.yml` or `{stack}_k8s_vars.yml`):
+
+        target_set_resources: True
+        target_cpu_request: "250m"
+        target_hpa_enabled: True
+        target_hpa_min_replicas: 2
+        target_hpa_max_replicas: 10
+
+Example: hapi-ais-llm's request-rate HPA, so it no longer needs applying by hand:
+
+        target_hpa_enabled: True
+        target_hpa_min_replicas: 20
+        target_hpa_max_replicas: 60
+        target_hpa_cpu_utilization: 50
+        target_hpa_metrics:
+          - type: Pods
+            pods:
+              metric:
+                name: gunicorn_requests_per_second
+              target:
+                type: AverageValue
+                averageValue: "2"
+        target_hpa_behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 30
+            selectPolicy: Max
+            policies:
+              - {type: Percent, value: 50, periodSeconds: 30}
+              - {type: Pods, value: 6, periodSeconds: 30}
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            selectPolicy: Max
+            policies:
+              - {type: Percent, value: 10, periodSeconds: 60}
+
 ## Variables Job/CronJob 
 deploy_type=job or cronjob
 
