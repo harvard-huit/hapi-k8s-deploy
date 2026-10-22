@@ -7,7 +7,9 @@ This package installs scripts that can run from the command line. In addition, t
 1. Kubectl 
 1. Kubectl config file
 
-        aws eks --region us-east-1 update-kubeconfig --name adexk8s-eks-cluster-{stack} --alias env-{stack}
+        aws eks --region us-east-1 update-kubeconfig --name "$(k8sdeploy -s {stack} --print-cluster-name)" --alias env-{stack}
+
+   See [Cluster selection](#cluster-selection) for which cluster that is.
         
 ## Install
 
@@ -31,6 +33,7 @@ Must set ENV Variable or pass in ECR_ACCOUNT_ID
 Must be logged into the appropriate AWS account for secrets  `stack/secretname` to exist.
 
         usage: k8sdeploy [-h] [-s STACK] [-a ACTION] [-d] [-f FILENAME] [-e ECR_ACCOUNT_ID]
+                         [-u UPDATE_EKS_CONFIG] [-c]
 
         Create K8s artifacts within cluster.
 
@@ -47,6 +50,10 @@ Must be logged into the appropriate AWS account for secrets  `stack/secretname` 
                                 directory}/k8s_vars/{stack}_k8s_vars.yml
         -e ECR_ACCOUNT_ID, --ecr-account-id ECR_ACCOUNT_ID
                                 ECR Account ID. Default: Environment Variable 'ECR_ACCOUNT_ID'
+        -u UPDATE_EKS_CONFIG, --update-eks-config UPDATE_EKS_CONFIG
+                                Update EKS CIDRs: Github runner IP4 address to either add or remove
+        -c, --print-cluster-name
+                                Print the EKS cluster name the stack and k8s vars resolve to, then exit
 
 ### Exit status
 
@@ -72,7 +79,38 @@ reachable from where it runs. The `--update-eks-config` add, run by
 runner's IP to `publicAccessCidrs`. EKS applies that change asynchronously. Without the
 wait the first `kubectl` call timed out (`failed to download openapi`), and a cleanup that
 ran before the add landed found no IP to remove, leaving it allowlisted.
-        
+
+## Cluster selection
+
+Clusters are named by **generation**, so a refactor that renames them can run beside the
+clusters it replaces:
+
+Generation | Cluster name | Built by
+---------- | ------------ | --------
+gen1 | `adexk8s-eks-cluster-{stack}` | the original clusters
+gen2 | `adexk8s-{stack}-eks-cluster` | [ansible-role-adexk8s](https://github.huit.harvard.edu/HUIT/ansible-role-adexk8s)
+
+Each stack deploys to its default generation (`STACK_CLUSTER_GENERATION` in
+`src/k8sdeploy/k8sdeploy.py`): `test` is gen2; `sand`, `dev`, `stage` and `prod` are gen1.
+An app can move ahead of its stack with `target_eks_cluster` in its k8s vars, set to a
+generation or, as an escape hatch, a full cluster name:
+
+```yaml
+# k8s_vars/dev_k8s_vars.yml: this app's dev deploy goes to adexk8s-dev-eks-cluster
+target_eks_cluster: gen2
+```
+
+The deploy (`k8sdeploy -f`), the runner allowlist (`--update-eks-config -f`) and the
+kubeconfig (`--print-cluster-name -f`) all resolve the name the same way, so pass the same
+vars file to each, as `hapi-action-eksdeploy` does. Before the first apply `k8sdeploy`
+checks that the current kubectl context is on that cluster and fails if not. That catches
+a kubeconfig written for gen1 while the app targets gen2. A context not written by
+`aws eks update-kubeconfig` can't be checked, and only gets a warning.
+
+Moving a stack to a new generation is a one-line change to `STACK_CLUSTER_GENERATION`
+once its apps are deployed there. Apps not ready yet pin the old one with
+`target_eks_cluster: gen1` until they are. A gen3 is a new `CLUSTER_NAME_FORMATS` entry.
+
 
 
 ## K8s Variables API deploy
@@ -100,6 +138,7 @@ ingress_group_name | string | Application Load Balancer group, combine multiple 
 ingress_inbound_security_groups | string | Inbound Security group Ids | Apigee Edge IPs and DMSDEVOPS Tunnel
 ingress_tags | string | Comma separated string of default tags added to ingress | "Name={{ ingress_load_balancer_name }},dms_app_family=adex,dms_service=adex,dms_stack={{ stack }},environment={{ environment }},huit_assetid=9301,product=adexk8s,waf-type=external-alb"
 ingress_additional_tags | string | additional tags you want added to ingress | ''
+target_eks_cluster | string | Optional - cluster generation (`gen1`, `gen2`) or cluster name to deploy to. See [Cluster selection](#cluster-selection) | the stack's default generation
 
 ## Resource Constraints
 deploy_type=api

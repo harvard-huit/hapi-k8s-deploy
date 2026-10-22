@@ -5,12 +5,58 @@ import jinja2
 import json
 import tempfile
 import base64
+import re
 import sys
 from contextlib import contextmanager
 from botocore.exceptions import ClientError, NoCredentialsError
 from subprocess import run, check_output, CalledProcessError
 from six import b
 from time import sleep
+
+# EKS cluster name per generation. A refactor that renames clusters adds a
+# generation here; stacks then move to it in STACK_CLUSTER_GENERATION, and
+# single apps can move ahead of their stack with target_eks_cluster.
+#   gen1: the original clusters
+#   gen2: clusters built by ansible-role-adexk8s
+CLUSTER_NAME_FORMATS={
+    "gen1":"adexk8s-eks-cluster-{stack}",
+    "gen2":"adexk8s-{stack}-eks-cluster",
+}
+# Generation each stack deploys to unless the app's k8s vars set target_eks_cluster
+STACK_CLUSTER_GENERATION={
+    "sand":"gen1",
+    "dev":"gen1",
+    "test":"gen2",
+    "stage":"gen1",
+    "prod":"gen1",
+}
+
+def resolve_cluster_name(stack,var_data=None):
+    """
+        target_eks_cluster in the app's k8s vars picks a generation (gen1,
+        gen2, ...) or names a cluster outright; without it the stack's
+        default generation applies.
+    """
+    target=str((var_data or {}).get('target_eks_cluster') or STACK_CLUSTER_GENERATION.get(stack) or '')
+    generations=", ".join(CLUSTER_NAME_FORMATS)
+    if not target:
+        raise ValueError(f"Stack '{stack}' has no default cluster generation; set target_eks_cluster to one of {generations} or a cluster name")
+    if target in CLUSTER_NAME_FORMATS:
+        return CLUSTER_NAME_FORMATS[target].format(stack=stack)
+    if re.fullmatch(r"gen\d+",target):
+        raise ValueError(f"target_eks_cluster: unknown cluster generation '{target}' (known: {generations})")
+    return target
+
+def read_cluster_vars(filename):
+    """
+        The k8s vars for cluster selection only. A missing file means the
+        stack default, as before target_eks_cluster existed.
+    """
+    if not filename or not os.path.exists(filename):
+        print(f"k8sdeploy: {filename} not found; using the stack's default cluster generation", file=sys.stderr)
+        return {}
+    with open(filename, 'r') as f1:
+        return yaml.safe_load(f1.read()) or {}
 
 class KubernetesDeploy():
     def __init__(self,var_filename,stack,ecr_account_id):
@@ -20,7 +66,7 @@ class KubernetesDeploy():
         self.vars=self.__deploy_data__(var_filename,ecr_account_id)
         self.rollout_restart=False
         self.eks=boto3.client('eks')
-        self.cluster_name=f"adexk8s-eks-cluster-{self.stack}"
+        self.cluster_name=resolve_cluster_name(self.stack,self.vars)
 
     def __deploy_data__(self,filename,ecr_account_id):
         self.checkAWSToken(ecr_account_id)
@@ -114,7 +160,7 @@ class KubernetesDeploy():
         raise ValueError(f"{variable_name} must be comma-separated key=value (or key:value) pairs, got: {tags_string!r}")
 
     def get_tag_data(self, var_data):
-        lookup={"dev":"Development","prod":"Production","stage":"Stage","sand":"Development"}
+        lookup={"dev":"Development","prod":"Production","stage":"Stage","sand":"Development","test":"Test"}
         var_data['stack']=self.stack
         var_data['environment']=lookup[self.stack]
         return var_data
@@ -171,7 +217,7 @@ class KubernetesDeploy():
             sts = boto3.client('sts')
             account=sts.get_caller_identity()['Account']
             self.account=account
-            if (self.stack in ['stage','prod'] and account == ecr_account ) or (self.stack in ['dev','sand'] and account != ecr_account ):
+            if (self.stack in ['stage','prod'] and account == ecr_account ) or (self.stack in ['dev','sand','test'] and account != ecr_account ):
                 with self.disable_exception_traceback():
                     raise Exception(f"Stack '{self.stack}' is not consistent with AWS Account. Please login to the correct AWS Account. ")
         except ClientError as e:
@@ -224,6 +270,24 @@ class KubernetesDeploy():
         template=template_env.get_template(f"{template_name}.j2")
         return template.render(**data)
     
+    def check_kubeconfig_cluster(self):
+        """
+            kubectl deploys to whatever the current context points at. Fail
+            when that is not the cluster these k8s vars resolve to, e.g. a
+            kubeconfig written for the gen1 cluster while the app targets gen2.
+        """
+        result=run(['kubectl','config','view','--minify','-o','jsonpath={.contexts[0].context.cluster}'],
+                   capture_output=True, encoding='UTF-8')
+        context_cluster=result.stdout.strip()
+        # aws eks update-kubeconfig names the cluster entry by its ARN
+        if result.returncode != 0 or ':cluster/' not in context_cluster:
+            print(f"WARNING: could not confirm the current kubectl context targets {self.cluster_name}", file=sys.stderr)
+            return
+        if context_cluster.rsplit('/',1)[-1] != self.cluster_name:
+            with self.disable_exception_traceback():
+                raise Exception(f"The current kubectl context targets {context_cluster}, but these k8s vars deploy to "
+                                f"{self.cluster_name}. Run: aws eks update-kubeconfig --name {self.cluster_name}")
+
     def wait_api_availability(self):
         attempts=0
         wait=True
@@ -331,6 +395,7 @@ class KubernetesDeploy():
              f"--timeout={int(timeout)}s"], check=True)
 
     def deploy_objects(self,action="apply",delete_namespace=False):
+        self.check_kubeconfig_cluster()
         # First double check API is Ready after adding 
         # GH Runner Ip4 to cluster config 
         self.wait_api_availability()
@@ -370,9 +435,9 @@ class KubernetesDeploy():
             self.load_deploy("namespace",action)
 
 class EksUpateConfig():
-    def __init__(self,stack: str,github_runner_ip: str):
+    def __init__(self,stack: str,github_runner_ip: str,var_filename: str=None):
         self.stack=stack
-        self.cluster_name=f"adexk8s-eks-cluster-{self.stack}"
+        self.cluster_name=resolve_cluster_name(self.stack,read_cluster_vars(var_filename))
         self.ip4 = github_runner_ip
         self.eks=boto3.client('eks')
 
