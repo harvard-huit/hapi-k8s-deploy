@@ -1,0 +1,47 @@
+{#- HorizontalPodAutoscaler for the app's Deployment. Rendered only when #}
+{#- target_hpa_enabled; k8sdeploy checks the settings before anything is applied. #}
+{#- The managed-by label is how k8sdeploy finds its own HPA to remove when an app #}
+{#- turns autoscaling off. A hand-applied HPA without it is never touched. #}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ target_app_name }}
+  namespace: {{ target_namespace }}
+  labels:
+    app: {{ target_app_name }}
+    app.kubernetes.io/managed-by: k8sdeploy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ target_app_name }}
+  minReplicas: {{ target_hpa_min_replicas }}
+  maxReplicas: {{ target_hpa_max_replicas }}
+  metrics:
+{#- ContainerResource, not Resource: utilization is measured against the app #}
+{#- container's own requests, so sidecar requests don't dilute the percentage. #}
+{% if target_hpa_cpu_utilization is defined and target_hpa_cpu_utilization is not none and target_hpa_cpu_utilization != '' %}
+  - type: ContainerResource
+    containerResource:
+      name: cpu
+      container: {{ target_app_name }}
+      target:
+        type: Utilization
+        averageUtilization: {{ target_hpa_cpu_utilization }}
+{% endif %}
+{% if target_hpa_memory_utilization is defined and target_hpa_memory_utilization is not none and target_hpa_memory_utilization != '' %}
+  - type: ContainerResource
+    containerResource:
+      name: memory
+      container: {{ target_app_name }}
+      target:
+        type: Utilization
+        averageUtilization: {{ target_hpa_memory_utilization }}
+{% endif %}
+{#- Any other autoscaling/v2 metric, passed through as written (JSON is valid YAML). #}
+{% for metric in target_hpa_metrics %}
+  - {{ metric | tojson }}
+{% endfor %}
+{% if target_hpa_behavior %}
+  behavior: {{ target_hpa_behavior | tojson }}
+{% endif %}

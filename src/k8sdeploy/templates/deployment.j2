@@ -7,7 +7,14 @@ spec:
   selector:
     matchLabels:
       app: {{ target_app_name }}
+{#- With an HPA the replica count is the HPA's. Rendering target_replica_count would #}
+{#- reset a scaled-up Deployment on every deploy, so keep its live count, or the #}
+{#- HPA's minimum for a Deployment that doesn't exist yet. #}
+{% if target_hpa_enabled %}
+  replicas: {{ target_live_replica_count if (target_live_replica_count is defined and target_live_replica_count is not none) else target_hpa_min_replicas }}
+{% else %}
   replicas: {{ target_replica_count }}
+{% endif %}
 {#- Rollout strategy. Opt-in: without these Kubernetes applies its own defaults #}
 {#- of 25%/25%, which take serving pods away before replacements can serve. #}
 {% if (target_max_unavailable is defined and target_max_unavailable is not none and target_max_unavailable != '') or (target_max_surge is defined and target_max_surge is not none and target_max_surge != '') %}

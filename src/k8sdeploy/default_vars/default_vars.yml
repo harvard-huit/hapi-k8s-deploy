@@ -117,3 +117,20 @@ target_min_ready_seconds:
 # 0 skips the wait.
 target_rollout_timeout_seconds: 1800
 
+# Horizontal Pod Autoscaler (opt-in). Off by default, so a deployment that does
+# not set target_hpa_enabled renders exactly as before and gets no HPA.
+# While it is on, the HPA owns the replica count: each deploy keeps the
+# Deployment's live count instead of resetting it to target_replica_count.
+# Turning it off removes the HPA k8sdeploy created (never a hand-applied one).
+target_hpa_enabled: False
+# Defaults to target_replica_count. Required: target_hpa_max_replicas.
+target_hpa_min_replicas:
+target_hpa_max_replicas:
+# Percent of the app container's CPU / memory REQUEST, so target_set_resources
+# must be True. Set to '' to scale on target_hpa_metrics alone.
+target_hpa_cpu_utilization: 70
+target_hpa_memory_utilization:
+# Extra autoscaling/v2 metrics (Pods, Object, External), as written in an HPA
+target_hpa_metrics: []
+# autoscaling/v2 behavior block. Empty uses the Kubernetes defaults.
+target_hpa_behavior: {}
